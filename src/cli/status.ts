@@ -4,7 +4,7 @@ import { Command } from "commander";
 import { continuityDir } from "../core/paths.js";
 import { listJobs } from "../core/context-pack.js";
 import { readActiveJob } from "../core/active-job.js";
-import { readEvents } from "../core/events.js";
+import { openDb } from "../core/db.js";
 
 export function registerStatusCommand(program: Command): void {
   program
@@ -28,14 +28,33 @@ export function registerStatusCommand(program: Command): void {
         console.log(`Attached: ${active.slug}`);
         console.log(`Since:    ${active.attached_at}`);
 
-        const { count, last } = readEvents(root);
-        if (count > 0) {
-          console.log(`Activity: ${count} event${count === 1 ? "" : "s"}`);
-          if (last) {
-            console.log(`Last:     ${last.type} at ${last.timestamp}`);
+        try {
+          const db = openDb(root);
+
+          const eventCount = (
+            db.prepare(`SELECT COUNT(*) as n FROM events WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?)`).get(active.slug) as { n: number }
+          ).n;
+
+          const lastEvent = db
+            .prepare(`SELECT type, timestamp FROM events WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?) ORDER BY id DESC LIMIT 1`)
+            .get(active.slug) as { type: string; timestamp: string } | undefined;
+
+          const sessionCount = (
+            db.prepare(`SELECT COUNT(*) as n FROM sessions WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?)`).get(active.slug) as { n: number }
+          ).n;
+
+          db.close();
+
+          if (eventCount > 0) {
+            console.log(`Activity: ${eventCount} event${eventCount === 1 ? "" : "s"} across ${sessionCount} session${sessionCount === 1 ? "" : "s"}`);
+            if (lastEvent) {
+              console.log(`Last:     ${lastEvent.type} at ${lastEvent.timestamp}`);
+            }
+          } else {
+            console.log(`Activity: none since attach`);
           }
-        } else {
-          console.log(`Activity: none since attach`);
+        } catch {
+          console.log(`Activity: (state database unavailable)`);
         }
       } else {
         console.log(`Attached: none`);
