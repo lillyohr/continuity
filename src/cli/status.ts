@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { Command } from "commander";
 import { continuityDir } from "../core/paths.js";
 import { listJobs } from "../core/context-pack.js";
+import { readActiveJob } from "../core/active-job.js";
+import { readEvents } from "../core/events.js";
 
 export function registerStatusCommand(program: Command): void {
   program
@@ -17,10 +19,28 @@ export function registerStatusCommand(program: Command): void {
         return;
       }
 
+      const active = readActiveJob(root);
       const jobs = listJobs(root);
 
       console.log(`Project:  ${root}`);
-      console.log(`State:    unattached`);
+
+      if (active) {
+        console.log(`Attached: ${active.slug}`);
+        console.log(`Since:    ${active.attached_at}`);
+
+        const { count, last } = readEvents(root);
+        if (count > 0) {
+          console.log(`Activity: ${count} event${count === 1 ? "" : "s"}`);
+          if (last) {
+            console.log(`Last:     ${last.type} at ${last.timestamp}`);
+          }
+        } else {
+          console.log(`Activity: none since attach`);
+        }
+      } else {
+        console.log(`Attached: none`);
+      }
+
       console.log(``);
 
       if (jobs.length === 0) {
@@ -30,7 +50,8 @@ export function registerStatusCommand(program: Command): void {
 
       console.log(`Jobs (${jobs.length}):`);
       for (const job of jobs) {
-        console.log(`  ${job.slug}`);
+        const marker = active?.slug === job.slug ? " ← attached" : "";
+        console.log(`  ${job.slug}${marker}`);
       }
 
       console.log(``);
