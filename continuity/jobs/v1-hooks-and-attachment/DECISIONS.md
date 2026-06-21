@@ -130,3 +130,33 @@ all hook scripts in `plugin/hooks/scripts/`
 **Supersedes:** none
 
 **Superseded by:** none
+
+---
+
+## DEC-005 — PreCompact initiates checkpoint, not suggests it
+
+**Status:** accepted
+
+**Date:** 2026-06-21
+
+**Decision:** The PreCompact hook outputs an imperative instruction to Claude:
+`[CONTINUITY] Job "<slug>" has unsaved activity. Run 'continuity checkpoint <slug>' now before this compaction proceeds.`
+If no job is attached, it outputs nothing. Session-start outputs attach status
+only when a job is attached; silent when unattached.
+
+**Why:** "Consider running checkpoint" has near-zero adoption — nobody acts on
+suggestions during a compaction flow. The hook's output is processed by Claude
+before compaction; framing it as imperative means Claude executes it rather than
+skipping it. Silent when unattached avoids noise in sessions that don't use Continuity.
+
+**Consequences:** PreCompact hook must read active-job.json to determine whether
+to output anything. When checkpoint draft generation lands, PreCompact becomes
+the trigger for auto-generation, not just a reminder. The checkpoint command
+must be safe to run mid-session without user pre-approval.
+
+**Applies to:** `src/cli/hook.ts`, `plugin/hooks/scripts/pre-compact.js`,
+`plugin/hooks/scripts/session-start.js`
+
+**Supersedes:** none
+
+**Superseded by:** none

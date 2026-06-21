@@ -52,5 +52,15 @@ export function registerHookCommand(program: Command): void {
       };
 
       appendEvent(root, eventType, job, summaries[eventType]);
+
+      if (eventType === "session_start") {
+        if (job) {
+          process.stdout.write(`Continuity: attached to ${job.slug}. Run \`continuity resume ${job.slug}\` to load context.\n`);
+        }
+      }
+
+      if (eventType === "pre_compact" && job) {
+        process.stdout.write(`[CONTINUITY] Job "${job.slug}" has unsaved activity. Run \`continuity checkpoint ${job.slug}\` now before this compaction proceeds.\n`);
+      }
     });
 }

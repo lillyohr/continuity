@@ -1,14 +1,18 @@
 #!/usr/bin/env node
-// Called by Claude Code on PreCompact. Records the event and reminds about checkpoint.
+// Called by Claude Code on PreCompact. Records the event and issues a checkpoint
+// instruction if a job is attached. Output is imperative — Claude should act on it.
 import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const projectRoot = process.cwd();
 const cli = resolve(import.meta.dirname, "../../../dist/cli/index.js");
 
-spawnSync(process.execPath, [cli, "hook", "pre-compact", "-p", projectRoot], {
+const result = spawnSync(process.execPath, [cli, "hook", "pre-compact", "-p", projectRoot], {
   timeout: 5000,
+  encoding: "utf8",
 });
 
-process.stdout.write("Continuity: compaction observed. Run `continuity checkpoint` if this job needs a handoff update.\n");
+if (result.stdout?.trim()) {
+  process.stdout.write(result.stdout.trim() + "\n");
+}
 // failures are silent — never block Claude
