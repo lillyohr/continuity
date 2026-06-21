@@ -1,0 +1,8 @@
+{
+  "name": "continuity",
+  "description": "Project-scoped continuity layer for AI coding sessions. Helps preserve job state across Claude conversations via structured resume files.",
+  "author": {
+    "name": "Lilly Ohr",
+    "url": "https://github.com/ljohr/continuity"
+  }
+}
