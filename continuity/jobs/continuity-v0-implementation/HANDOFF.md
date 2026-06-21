@@ -22,21 +22,19 @@ hooks, or auto-generation.
 - CLI exposes: `init`, `start`, `status`, `resume`, `checkpoint`.
 - Plugin skeleton exists (`plugin.json`, SKILL.md, 5 command files). Hook format confirmed from real plugin examples; hooks go in `plugin.json`, added in V1.5.
 - Plugin command invocation naming (`/continuity/resume` vs `/continuity:resume`) is unverified — needs a live install to confirm.
-- Next: V0-010 dogfood on a real job, then V1 planning.
+- V0 dogfood complete: Continuity is tracking its own development. This context pack lives at `continuity/jobs/continuity-v0-implementation/`.
 
 ## Current state
 
-V0 is feature-complete. All 15 unit tests pass. Docs cover architecture, format,
-and the dogfood procedure. The CLI runs correctly via `node dist/cli/index.js`
-or after `npm link`. Templates substitute `job_id`, slug, title, and date at
-job creation.
+V0 is complete and dogfooded. The tool is being used on itself — `continuity init`
+and `continuity start` were run on this repo, and this context pack is committed.
+The resume and checkpoint commands print correct instructions. DEC-005 (no milestone
+field) was the last design decision made during V0.
 
 ## Next step
 
-Run the V0-010 dogfood: pick a real in-progress job, `continuity init`, `continuity start`,
-fill HANDOFF.md, do work in Claude, `continuity checkpoint`, update the files, then
-open a fresh Claude session and run `continuity resume` — verify the fresh session
-states the correct goal, state, and next action in under 60 seconds.
+Plan V1: define the first focused workstream jobs (e.g. `sqlite-job-state`,
+`explicit-attach-detach`) and decide on the V1 scope boundary.
 
 ## Plan
 
@@ -47,15 +45,13 @@ states the correct goal, state, and next action in under 60 seconds.
 5. ~~Plugin skeleton~~ ✓
 6. ~~Unit tests~~ ✓
 7. ~~Docs~~ ✓
-8. V0-010 dogfood
+8. ~~V0-010 dogfood~~ ✓
 9. Plan V1 (SQLite + explicit job attachment)
 
 ## Open questions
 
 - Does the plugin command file invoke as `/continuity/resume` or `/continuity:resume`?
   Needs a live Claude Code install to verify. Not a V0 blocker.
-- Should the dogfood example be committed to the repo? Depends on whether the
-  Continuity-on-Continuity scenario reads clearly for someone evaluating the product.
 
 ## Avoid / already rejected
 
@@ -81,3 +77,4 @@ states the correct goal, state, and next action in under 60 seconds.
 - ART-001: `src/cli/index.ts` — CLI entry and command wiring
 - ART-002: `plugin/.claude-plugin/plugin.json` — plugin manifest
 - ART-003: `docs/v0-manual-context-pack.md` — V0 dogfood procedure
+- ART-004: `continuity/jobs/continuity-v0-implementation/` — this context pack

@@ -91,3 +91,28 @@ do, and the dogfood test steps.
 
 **Notes:** The dogfood example (if committed) goes in `examples/basic/` and should
 be produced by actually running this procedure, not by hand-authoring stubs.
+
+---
+
+## ART-004 — V0 context pack (this file)
+
+**Path:** `continuity/jobs/continuity-v0-implementation/`
+
+**Kind:** doc
+
+**What it is:** The Context Pack for this job, committed to the repo. Produced by
+running `continuity init` and `continuity start` on this repo, then filling the
+files from the session history.
+
+**Why it matters:** Proof that V0 works on a real job. A fresh session can run
+`continuity resume continuity-v0-implementation` and recover state correctly.
+
+**Status:** active
+
+**Last known state:** Committed on 2026-06-21. Contains 5 decisions (DEC-001–005)
+and 4 artifacts (ART-001–004). HANDOFF reflects V0 complete + dogfood done.
+
+**Related decisions:** DEC-004, DEC-005
+
+**Notes:** This is the Continuity-on-Continuity dogfood. Update this pack at the
+start of each V1 session.
