@@ -44,8 +44,8 @@ Runtime folder created inside a user's project:
         HANDOFF.md       ← current goal, state, next step, open questions
         DECISIONS.md     ← durable decisions with DEC-* IDs (oldest-first)
         ARTIFACTS.md     ← files/outputs that matter, with ART-* IDs
-        pending/         ← checkpoint drafts (V2+)
-    .state/              ← SQLite + lock file (V1+)
+        pending/         ← checkpoint drafts (when available)
+    .state/              ← internal state (lock file, event log, SQLite)
 ```
 
 ## Design decisions
@@ -54,28 +54,16 @@ Runtime folder created inside a user's project:
 span many conversations and sessions. Same repo ≠ same job. New conversations
 are unattached by default — this prevents wrong context from being loaded silently.
 
-**Markdown is the user-facing source of truth.** SQLite tracks internal state
-(V1+); canonical context lives in the Markdown files. Wrong context is worse than
-no context.
+**Markdown is the user-facing source of truth.** Internal state tracks sessions
+and events; canonical context lives in the Markdown files. Wrong context is worse
+than no context.
 
 **Explicit apply.** The checkpoint workflow requires explicit user approval before
 writing to canonical files. Continuity should feel like autosave + pull request,
 not autocommit to main.
 
-**Token-free dirty tracking.** Checkpoint status is derived from events (V1.5+),
-not from model calls. Drafts are lazy — only generated on demand.
-
-## Version roadmap
-
-```
-V0   — Manual Context Pack (current)
-V1   — SQLite + explicit job attachment
-V1.5 — Token-free dirty tracking via hooks
-V2   — Lazy checkpoint drafts
-V2.25 — Resume eval benchmark
-V2.5 — PreCompact / exit safety
-V3+  — Compass, Worktrail (if validated by benchmark)
-```
+**Token-free dirty tracking.** Checkpoint status is derived from events, not from
+model calls. Drafts are lazy — only generated on demand.
 
 ## North-star test (Monday Morning Test)
 
