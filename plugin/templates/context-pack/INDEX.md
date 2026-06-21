@@ -1,6 +1,8 @@
 ---
-job: "{{SLUG}}"
-started: "{{DATE}}"
+job_id: "{{JOB_ID}}"
+slug: "{{SLUG}}"
+title: "{{JOB_NAME}}"
+created: "{{DATE}}"
 status: active
 ---
 
@@ -10,7 +12,7 @@ This is the entry point for this job.
 
 ## Current status
 
-<!-- active | paused | blocked | complete -->
+active
 
 ## Files
 
@@ -23,7 +25,7 @@ This is the entry point for this job.
 ## How to resume
 
 1. Read `HANDOFF.md`.
-2. Skim accepted decisions in `DECISIONS.md`.
+2. Skim accepted decisions in `DECISIONS.md` for constraints.
 3. Check referenced artifacts in `ARTIFACTS.md`.
 4. State the current goal, current state, and next action before continuing.
 5. Do not revisit items listed under `Avoid / already rejected` unless the user explicitly asks.

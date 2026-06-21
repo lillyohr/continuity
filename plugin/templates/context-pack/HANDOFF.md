@@ -1,5 +1,6 @@
 ---
-job: "{{SLUG}}"
+job_id: "{{JOB_ID}}"
+slug: "{{SLUG}}"
 last_updated: "{{DATE}}"
 status: active
 ---
@@ -7,6 +8,7 @@ status: active
 # Handoff — {{JOB_NAME}}
 
 <!-- Keep this file short enough to understand in under 60 seconds. -->
+<!-- Keep this file current-state focused. Durable decisions go in DECISIONS.md; important files/outputs go in ARTIFACTS.md. -->
 
 ## Goal
 

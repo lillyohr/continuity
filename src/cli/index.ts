@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { Command } from "commander";
 import { registerInitCommand } from "./init.js";
+import { registerStartCommand } from "./start.js";
 
 const pkg = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
@@ -16,5 +17,6 @@ program
   .showHelpAfterError("(add --help for usage)");
 
 registerInitCommand(program);
+registerStartCommand(program);
 
 program.parse(process.argv);
