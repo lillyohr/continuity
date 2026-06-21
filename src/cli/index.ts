@@ -6,6 +6,8 @@ import { registerStartCommand } from "./start.js";
 import { registerStatusCommand } from "./status.js";
 import { registerResumeCommand } from "./resume.js";
 import { registerCheckpointCommand } from "./checkpoint.js";
+import { registerAttachCommand } from "./attach.js";
+import { registerDetachCommand } from "./detach.js";
 
 const pkg = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
@@ -24,5 +26,7 @@ registerStartCommand(program);
 registerStatusCommand(program);
 registerResumeCommand(program);
 registerCheckpointCommand(program);
+registerAttachCommand(program);
+registerDetachCommand(program);
 
 program.parse(process.argv);

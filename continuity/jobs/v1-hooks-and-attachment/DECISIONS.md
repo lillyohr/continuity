@@ -76,22 +76,24 @@ Per-worktree scoping can be added later without breaking the current model.
 
 ---
 
-## DEC-003 — expires_at exists in active-job.json; no auto-expiry in V1
+## DEC-003 — No expires_at in active-job.json
 
 **Status:** accepted
 
 **Date:** 2026-06-21
 
-**Decision:** `active-job.json` includes an `expires_at` field (30 days from
-attach) but V1 does not enforce expiry. Expired locks are treated as unattached
-only after the status command gains expiry warnings.
+**Decision:** `active-job.json` has no `expires_at` field. The lock is replaced
+on next `attach` and cleared by `detach` — time-based expiry adds no value.
+Context Pack files are never deleted; done jobs get `status: archived` in
+frontmatter instead.
 
-**Why:** A 30-day auto-expiry could surprise someone returning to a paused
-project. The field gives the concept a home without enforcing behavior prematurely.
-The `attach` command can refresh `expires_at` when it runs.
+**Why:** Expiry only matters when sessions auto-attach and locks can go stale
+without user action. Since attach/detach is always explicit, the lock is always
+intentional. A date field with no enforcement is misleading. Context Packs are
+tiny (even 100 jobs is ~2MB) so deletion is never necessary — archiving is enough.
 
-**Consequences:** `active-job.ts` writes `expires_at` but the read path does
-not check it in V1. Status and expiry enforcement come in a later pass.
+**Consequences:** `active-job.ts` schema has no expiry field. Future job lifecycle
+management uses `status: archived` in INDEX.md frontmatter, not file deletion.
 
 **Applies to:** `src/core/active-job.ts`
 
