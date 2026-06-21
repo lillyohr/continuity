@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { registerInitCommand } from "./init.js";
 import { registerStartCommand } from "./start.js";
 import { registerStatusCommand } from "./status.js";
+import { registerResumeCommand } from "./resume.js";
 
 const pkg = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
@@ -20,5 +21,6 @@ program
 registerInitCommand(program);
 registerStartCommand(program);
 registerStatusCommand(program);
+registerResumeCommand(program);
 
 program.parse(process.argv);
