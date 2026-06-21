@@ -8,13 +8,13 @@ work across sessions using job-scoped resume files.
 The core loop:
 
 ```
-init → start job → work → checkpoint → resume
+init → start job → attach → work → checkpoint → resume
 ```
 
 The core trust loop:
 
 ```
-status → attached/unattached → explicit resume → explicit apply
+status → attach → hooks record activity → explicit resume → explicit apply
 ```
 
 ## Layout
@@ -26,7 +26,8 @@ continuity/              ← this repo (the plugin + CLI package)
     core/                ← job identity, path resolution, slug, template rendering
   plugin/
     .claude-plugin/      ← Claude Code plugin manifest
-    commands/continuity/ ← slash command markdown files
+    commands/            ← slash command markdown files
+    hooks/scripts/       ← hook scripts (SessionStart, Stop, PreCompact, PostToolUse)
     skills/context/      ← context skill (system prompt injection)
     templates/           ← Markdown templates for Context Pack files
   tests/                 ← node:test unit tests (run via tsx, not compiled)
