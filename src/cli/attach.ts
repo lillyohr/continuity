@@ -5,6 +5,7 @@ import { Command } from "commander";
 import { continuityDir, jobDir } from "../core/paths.js";
 import { writeActiveJob } from "../core/active-job.js";
 import { listJobs } from "../core/context-pack.js";
+import { openDb } from "../core/db.js";
 
 function readJobId(projectRoot: string, slug: string): string | null {
   const indexPath = join(jobDir(projectRoot, slug), "INDEX.md");
@@ -36,6 +37,21 @@ export function registerAttachCommand(program: Command): void {
 
       const jobId = readJobId(root, slug) ?? slug;
       writeActiveJob(root, { job_id: jobId, slug });
+
+      try {
+        const db = openDb(root);
+        // ensure job row exists (may have been created before SQLite was added)
+        db.prepare(
+          `INSERT OR IGNORE INTO jobs (job_id, slug, title, created_at, status)
+           VALUES (?, ?, ?, ?, 'active')`
+        ).run(jobId, slug, slug, new Date().toISOString());
+        db.prepare(
+          `INSERT INTO sessions (job_id, started_at) VALUES (?, ?)`
+        ).run(jobId, new Date().toISOString());
+        db.close();
+      } catch {
+        // non-fatal: active-job.json is the source of truth for attachment
+      }
 
       console.log(`Attached to: ${slug}`);
       console.log(`Run: continuity resume ${slug} to read the context pack.`);

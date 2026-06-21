@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { continuityDir, jobsDir } from "../core/paths.js";
 import { createJobIdentity } from "../core/job.js";
 import { createContextPack } from "../core/context-pack.js";
+import { openDb } from "../core/db.js";
 
 export function registerStartCommand(program: Command): void {
   program
@@ -29,6 +30,18 @@ export function registerStartCommand(program: Command): void {
         jobName: identity.jobName,
         createdAt: identity.createdAt,
       });
+
+      try {
+        const db = openDb(root);
+        db.prepare(
+          `INSERT OR IGNORE INTO jobs (job_id, slug, title, created_at, status)
+           VALUES (?, ?, ?, ?, 'active')`
+        ).run(identity.jobId, identity.slug, identity.jobName, identity.createdAt);
+        db.close();
+      } catch (err) {
+        console.error(`Warning: could not update state database: ${(err as Error).message}`);
+        console.error(`Run 'continuity status' later to re-index this job.`);
+      }
 
       console.log(`Created job: ${identity.slug}`);
       console.log(`\nResume files:`);
