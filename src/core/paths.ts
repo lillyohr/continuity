@@ -21,6 +21,18 @@ export function pendingDir(projectRoot: string, slug: string): string {
   return join(jobDir(projectRoot, slug), "pending");
 }
 
+export function stateDir(projectRoot: string): string {
+  return join(continuityDir(projectRoot), STATE_DIR);
+}
+
+export function activeJobPath(projectRoot: string): string {
+  return join(stateDir(projectRoot), "active-job.json");
+}
+
+export function eventsPath(projectRoot: string): string {
+  return join(stateDir(projectRoot), "events.jsonl");
+}
+
 /** Absolute path to plugin/templates/context-pack/, resolved package-relative. */
 export function templatesDir(): string {
   // __file = dist/core/paths.js → package root is two levels up
