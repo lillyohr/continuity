@@ -13,36 +13,24 @@ Replace the checkpoint draft/apply cycle with automatic HANDOFF sync at session 
 
 ## Resume summary
 
-- Architecture discussion complete: Stop-first, PreCompact deferred to V1.5, PostToolUse flag only
-- Writes split by risk: HANDOFF auto via Stop hook; DECISIONS/ARTIFACTS deliberate via SKILL.md
-- Architecture and roadmap docs updated; old checkpoint docs removed
-- No implementation code written yet — design only
-- First step: write and manually test the stop-sync instruction template
+- All implementation shipped (8 commits): template, schema reset, hook rewrite, checkpoint removal, status update, tests
+- 32/32 tests pass — hook behavior verified at unit level
+- `pending/` directories deleted from all existing jobs
+- One gap remaining: manual dogfood to verify `decision: "block"` actually surfaces to Claude
 
 ## Current state
 
-Design locked. Documentation current. Old checkpoint code still in codebase (src/cli/checkpoint.ts, checkpoints SQLite table, pending/ in job templates). Nothing new has been built yet.
+Implementation complete. Stop hook blocks on `has_edits = 1` and outputs `{"decision": "block", "reason": ...}` with the stop-sync instruction. PostToolUse flags edits. SessionStart resets the flag and prints re-anchor message. All old checkpoint code removed. 32/32 tests pass.
+
+Not yet dogfooded: unknown whether Claude Code actually presents the `reason` text as an actionable directive to the model. This is the critical open question (DEC-003 pass criteria).
 
 ## Next step
 
-Write `plugin/templates/hooks/stop-sync.md`. Test it manually against this job's context pack before touching any code. Pass criteria are defined in DEC-003.
-
-## Plan
-
-1. Write `plugin/templates/hooks/stop-sync.md`
-2. Manual dogfood against this context pack — verify pass criteria
-3. Add `has_edits` + `stop_sync_requested_at` to sessions schema (migration)
-4. Update PostToolUse hook: flag Edit/Write/MultiEdit only, no event rows
-5. Update Stop hook: `stop_hook_active` guard first; block with instruction when conditions met
-6. Remove checkpoint draft/apply/ignore commands and their tests
-7. Drop checkpoints table (migration)
-8. Remove pending/ from job templates and start command
-9. Verify Stop hook fires, blocks, and second stop exits cleanly
+Manual dogfood: attach to this job, make some edits, end the session. Verify Stop hook fires, Claude sees the sync instruction, and HANDOFF.md is updated correctly per the DEC-003 pass criteria.
 
 ## Open questions
 
-- Does `decision: "block"` with `reason` actually surface to Claude as an actionable directive? Must be verified by dogfood before trusting this path.
-- Should SessionStart re-anchor output mention that Stop will auto-sync HANDOFF, so Claude knows the context pack will be updated at session end?
+- Does `decision: "block"` with `reason` actually surface to Claude as an actionable directive? The entire architecture depends on this. Must verify before trusting the path.
 
 ## Avoid / already rejected
 

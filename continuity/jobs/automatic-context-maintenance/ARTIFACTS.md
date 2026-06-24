@@ -54,18 +54,18 @@ this job. Only include things a future session would actually need to know about
 
 ---
 
-## ART-003 — Stop-sync instruction template (not yet written)
+## ART-003 — Stop-sync instruction template
 
 **Path:** plugin/templates/hooks/stop-sync.md
 
 **Kind:** config
 
-**What it is:** The instruction string the Stop hook sends Claude when it blocks the session. This is the primary product artifact of this job.
+**What it is:** The instruction string the Stop hook sends Claude when it blocks the session. The Stop hook reads this file at runtime and substitutes `{{SLUG}}`.
 
-**Why it matters:** Instruction quality determines whether HANDOFF updates are useful or noisy. Must be written and manually tested before any hook code is written. See DEC-003 for pass criteria.
+**Why it matters:** Instruction quality determines whether HANDOFF updates are useful or noisy. Must be manually dogfooded to verify DEC-003 pass criteria.
 
-**Status:** draft
+**Status:** active
 
-**Last known state:** Not yet written. Next step.
+**Last known state:** Written and committed. Wired into Stop hook. Not yet dogfooded — `decision: "block"` behavior unverified.
 
 **Related decisions:** DEC-003
