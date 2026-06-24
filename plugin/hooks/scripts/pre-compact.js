@@ -7,12 +7,17 @@ import { resolve } from "node:path";
 const projectRoot = process.cwd();
 const cli = resolve(import.meta.dirname, "../../../dist/cli/index.js");
 
-const result = spawnSync(process.execPath, [cli, "hook", "pre-compact", "-p", projectRoot], {
-  timeout: 5000,
-  encoding: "utf8",
+const chunks = [];
+process.stdin.on("data", (c) => chunks.push(c));
+process.stdin.on("end", () => {
+  const stdin = Buffer.concat(chunks);
+  const result = spawnSync(process.execPath, [cli, "hook", "pre-compact", "-p", projectRoot], {
+    input: stdin,
+    timeout: 5000,
+    encoding: "utf8",
+  });
+  if (result.stdout?.trim()) {
+    process.stdout.write(result.stdout.trim() + "\n");
+  }
+  // failures are silent — never block Claude
 });
-
-if (result.stdout?.trim()) {
-  process.stdout.write(result.stdout.trim() + "\n");
-}
-// failures are silent — never block Claude

@@ -20,6 +20,36 @@ function readStdin(): Promise<string> {
   });
 }
 
+function buildPayload(eventType: EventType, payload: Record<string, unknown>): string | undefined {
+  if (eventType === "pre_compact") {
+    const tokens = payload.conversation_token_count ?? payload.conversation_tokens_estimate;
+    if (tokens !== undefined) {
+      return JSON.stringify({ conversation_tokens_estimate: Number(tokens) });
+    }
+    return undefined;
+  }
+
+  if (eventType === "post_tool_use") {
+    const toolName = String(payload.tool_name ?? "unknown");
+    const path = deriveToolPath(toolName, payload.tool_input);
+    const facts: Record<string, string> = { tool_name: toolName };
+    if (path) facts.path = path;
+    return JSON.stringify(facts);
+  }
+
+  return undefined;
+}
+
+function deriveToolPath(toolName: string, toolInput: unknown): string | null {
+  if (!toolInput || typeof toolInput !== "object") return null;
+  const input = toolInput as Record<string, unknown>;
+  if (typeof input.file_path === "string") return input.file_path;
+  if (toolName === "Bash" && typeof input.command === "string") {
+    return input.command.slice(0, 80);
+  }
+  return null;
+}
+
 export function registerHookCommand(program: Command): void {
   program
     .command("hook <event>")
@@ -44,14 +74,16 @@ export function registerHookCommand(program: Command): void {
       const active = readActiveJob(root);
       const job = active ? { job_id: active.job_id, slug: active.slug } : null;
 
+      const toolName = String(payload.tool_name ?? "unknown");
       const summaries: Record<EventType, string> = {
         session_start: job ? `session started, attached to ${job.slug}` : "session started, unattached",
         stop: job ? `session stopped, attached to ${job.slug}` : "session stopped, unattached",
         pre_compact: job ? `compaction observed, attached to ${job.slug}` : "compaction observed, unattached",
-        post_tool_use: job ? `tool use in ${job.slug}: ${String(payload.tool_name ?? "unknown")}` : "tool use, unattached",
+        post_tool_use: job ? `tool use in ${job.slug}: ${toolName}` : `tool use, unattached: ${toolName}`,
       };
 
-      appendEvent(root, eventType, job, summaries[eventType]);
+      const payloadJson = buildPayload(eventType, payload);
+      appendEvent(root, eventType, job, summaries[eventType], payloadJson);
 
       if (eventType === "session_start") {
         if (job) {

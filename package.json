@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "dev": "tsx src/cli/index.ts",
-    "build": "tsc",
+    "build": "tsc && cp -r src/core/migrations dist/core/migrations",
     "start": "node dist/cli/index.js",
     "test": "tsx --test tests/*.test.ts"
   },

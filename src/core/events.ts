@@ -13,6 +13,8 @@ export type HookEvent = {
   summary: string;
 };
 
+const MAX_PAYLOAD_BYTES = 2048;
+
 export function appendEvent(
   projectRoot: string,
   type: EventType,
@@ -20,6 +22,9 @@ export function appendEvent(
   summary: string,
   payloadJson?: string,
 ): void {
+  if (payloadJson && Buffer.byteLength(payloadJson) > MAX_PAYLOAD_BYTES) {
+    payloadJson = JSON.stringify({ _truncated: true });
+  }
   const timestamp = new Date().toISOString();
 
   try {
