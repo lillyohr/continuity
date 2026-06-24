@@ -2,7 +2,7 @@
 job_id: "1ded18a1-fd21-4ae7-be3b-b1344e4a73e3"
 slug: "checkpoint-drafts"
 last_updated: "2026-06-23"
-status: active
+status: complete
 ---
 
 # Handoff — Checkpoint Drafts

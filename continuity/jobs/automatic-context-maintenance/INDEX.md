@@ -1,18 +1,18 @@
 ---
-job_id: "1ded18a1-fd21-4ae7-be3b-b1344e4a73e3"
-slug: "checkpoint-drafts"
-title: "Checkpoint Drafts"
+job_id: "ed8e7937-baaa-424c-8e1e-2121b2d95674"
+slug: "automatic-context-maintenance"
+title: "automatic context maintenance"
 created: "2026-06-24"
-status: complete
+status: active
 ---
 
-# Checkpoint Drafts
+# automatic context maintenance
 
 This is the entry point for this job.
 
 ## Current status
 
-complete
+active
 
 ## Files
 

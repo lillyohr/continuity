@@ -20,7 +20,7 @@ continuity resume <slug>       ← paste instruction into fresh session
 ## Acceptance criteria
 
 - `continuity init` creates `continuity/jobs/` (idempotent)
-- `continuity start` creates all four Context Pack files + `pending/`
+- `continuity start` creates all four Context Pack files
 - `continuity status` lists known jobs
 - `continuity resume <slug>` prints a resume instruction (does not dump files)
 - `continuity checkpoint [slug]` prints per-file update instructions with explicit-approval guard

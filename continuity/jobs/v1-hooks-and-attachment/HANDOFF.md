@@ -2,7 +2,7 @@
 job_id: "cd73a6a0-29f7-4c58-9a29-d6755f6914e1"
 slug: "v1-hooks-and-attachment"
 last_updated: "2026-06-23"
-status: active
+status: complete
 ---
 
 # Handoff — V1 Hooks and Attachment

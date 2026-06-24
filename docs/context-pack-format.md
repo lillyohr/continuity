@@ -12,7 +12,19 @@ Entry point. Read this first. Contains:
 - YAML frontmatter: `job_id`, `slug`, `title`, `created`, `status`
 - Links to the other three files
 - Resume sequence (5 steps)
-- Current status (active / paused / blocked / complete)
+- Current status (see below)
+
+**Allowed status values:** `active | paused | complete`
+
+| Status | Meaning |
+|---|---|
+| `active` | Job is in progress |
+| `paused` | Work is temporarily stopped but the job is not done |
+| `complete` | Work shipped, was intentionally abandoned, or was superseded by a newer job |
+
+**When to mark complete:** When the work has shipped, been intentionally abandoned, or been replaced by a newer job. Creating a new job does not automatically complete older jobs — but it is a good moment to review active jobs and mark finished ones complete.
+
+`continuity status` shows `active` and `paused` jobs by default. `complete` jobs are hidden unless explicitly requested.
 
 ## HANDOFF.md
 

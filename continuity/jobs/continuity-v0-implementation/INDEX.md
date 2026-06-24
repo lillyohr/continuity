@@ -3,7 +3,7 @@ job_id: "1906391a-d4ac-4c1f-b8b6-08652662d8d1"
 slug: "continuity-v0-implementation"
 title: "Continuity V0 Implementation"
 created: "2026-06-21"
-status: active
+status: complete
 ---
 
 # Continuity V0 Implementation
@@ -12,7 +12,7 @@ This is the entry point for this job.
 
 ## Current status
 
-active
+complete
 
 ## Files
 

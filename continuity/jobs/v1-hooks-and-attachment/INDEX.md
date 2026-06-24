@@ -3,7 +3,7 @@ job_id: "cd73a6a0-29f7-4c58-9a29-d6755f6914e1"
 slug: "v1-hooks-and-attachment"
 title: "V1 Hooks and Attachment"
 created: "2026-06-21"
-status: active
+status: complete
 ---
 
 # V1 Hooks and Attachment
@@ -12,7 +12,7 @@ This is the entry point for this job.
 
 ## Current status
 
-active — Hooks and SQLite complete. Refining payload_json (DEC-006), then Checkpoint Drafts.
+complete — Hooks and SQLite complete. Refining payload_json (DEC-006), then Checkpoint Drafts.
 
 ## Files
 
