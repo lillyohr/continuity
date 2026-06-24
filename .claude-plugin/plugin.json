@@ -7,8 +7,6 @@
     "name": "Lilly Ohr",
     "url": "https://github.com/lillyohr/continuity"
   },
-  "commands": "plugin/commands",
-  "skills": "plugin/skills",
   "hooks": {
     "SessionStart": [
       {
