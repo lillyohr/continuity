@@ -149,3 +149,75 @@ changes to the filter rules require updating the prompt template in
 **Supersedes:** none
 
 **Superseded by:** none
+
+---
+
+## DEC-005 — Stale detection: SQLite-stamped generated_at, lifecycle events only
+
+**Status:** accepted
+
+**Date:** 2026-06-24
+
+**Decision:** `checkpoint apply` determines staleness by comparing the checkpoint's `generated_at` (stored in SQLite before Claude writes the draft file) against lifecycle events only (`session_start`, `stop`, `pre_compact`). `post_tool_use` events are excluded.
+
+**Why:** Two interacting problems forced this design. First, if `generated_at` were derived from the file's mtime or frontmatter, the Write tool call that creates the draft would produce a `post_tool_use` event postdating it — immediately flagging the draft as stale. Stamping `generated_at` in SQLite before the Write call prevents this. Second, even with pre-Write stamping, any subsequent `post_tool_use` (from the checkpoint skill's own tool calls) would still cause false positives. Scoping to lifecycle events eliminates that noise: lifecycle events only fire on genuine session boundaries, not within the checkpoint workflow.
+
+**Consequences:** The `checkpoints` table stores `generated_at` and is the source of truth for stale detection — the frontmatter `generated_at` in the draft file is informational only. Future event types intended to trigger re-draft must be added to the lifecycle allowlist in `getLatestLifecycleEventTimestamp`.
+
+**Applies to:** `src/cli/checkpoint.ts` (`getLatestLifecycleEventTimestamp`, `getLatestCheckpoint`), `src/core/migrations/002_checkpoints.sql`
+
+**Supersedes:** none
+
+**Superseded by:** none
+
+---
+
+## DEC-006 — Checkpoint trigger model and synthesis direction
+
+**Status:** accepted
+
+**Date:** 2026-06-24
+
+**Decision:** Three checkpoint triggers, two synthesis modes:
+
+| Trigger | Mode | Cost | When |
+|---------|------|------|------|
+| Stop | assembly (V2) | cheap | every session end |
+| PreCompact | synthesis (V1 current) | expensive | context window full |
+| Explicit | synthesis (V1 current) | expensive | user-requested |
+
+PreCompact-only is too infrequent — it fires only when context fills up, which
+may be once every few sessions. Stop fires on every session close and is the
+right default trigger. But Stop-triggered synthesis-on-read is too expensive to
+run on every session.
+
+The solution: synthesis-on-write. PostToolUse events capture a semantic `effect`
+field while context is fresh, so Stop-triggered checkpoints become cheap
+query-and-assemble with no model call. PreCompact keeps the expensive synthesis
+as a safety net before context loss.
+
+Target PostToolUse payload (V2):
+`{ "tool_name": "Edit", "path": "src/cli/checkpoint.ts", "effect": "fixed stale detection to use lifecycle events only" }`
+
+**Why:** Frequent checkpoints require cheap checkpoints. Cheap checkpoints
+require structured semantic facts captured at write time, not synthesized at
+read time. The `effect` field is the key: it captures meaning when context is
+hot, so assembly at Stop time costs nothing extra.
+
+**Consequences:**
+- V1 (current): PreCompact and explicit triggers only. Synthesis-on-read via
+  `checkpoint draft`. Stop hook records an event but does not checkpoint.
+- V2: Stop hook triggers lightweight assembly checkpoint. PostToolUse payloads
+  include `effect` field populated during the session. `checkpoint draft` becomes
+  fallback for the assembly path only.
+- The `effect` field must be added to `src/cli/hook.ts` PostToolUse payload
+  extraction and to `plugin/hooks/scripts/post-tool-use.js`.
+
+**Applies to:** `plugin/hooks/scripts/stop.js`, `plugin/hooks/scripts/post-tool-use.js`,
+`src/cli/hook.ts`, future checkpoint assembly logic.
+
+**Supersedes:** DEC-005 in `v1-hooks-and-attachment` job (PreCompact initiates
+checkpoint) — that decision is correct for V1 but incomplete; Stop is the
+primary V2 trigger.
+
+**Superseded by:** none
