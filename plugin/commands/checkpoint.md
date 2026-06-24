@@ -1,17 +1,32 @@
 ---
-description: Checkpoint work in progress for a Continuity job
-argument-hint: [slug]
+description: Generate and apply a checkpoint draft for a Continuity job
+argument-hint: [draft|apply|ignore] [slug]
 ---
 
-If multiple jobs exist and no slug was provided, run `continuity status`
-and ask the user which job to checkpoint.
+Run `continuity status` first if you don't know which job is attached.
 
-Once you have the slug (or there is only one job), run:
+**To generate a draft:**
 
 ```
-continuity checkpoint <slug>
+continuity checkpoint draft <slug>
 ```
 
-Then follow the printed instructions to update each file.
-Confirm the proposed changes with the user before writing anything.
-Do not overwrite files without explicit approval.
+Read the output carefully. It is a generation prompt — follow it to produce
+the draft content and write it to the path shown (`pending/checkpoint-*.md`).
+Apply the signal filter: only include decisions with lasting consequences and
+artifacts a future session would actually reference.
+
+**To apply the draft:**
+
+```
+continuity checkpoint apply --slug <slug>
+```
+
+Show the user a summary of what changed before running this. If the draft is
+stale (new activity since generation), re-draft first.
+
+**To dismiss without applying:**
+
+```
+continuity checkpoint ignore --slug <slug>
+```
