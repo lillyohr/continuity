@@ -7,12 +7,12 @@ export type SessionActivity = {
   toolUseCount: number;
   filesModified: string[];  // Edit events
   filesCreated: string[];   // Write events
-  since: string | null;
 };
 
 export function getSessionActivity(root: string, slug: string): SessionActivity {
+  let db;
   try {
-    const db = openDb(root);
+    db = openDb(root);
 
     // Bound by the current session's start — gives only this session's tool uses,
     // not accumulated activity from prior sessions without an applied checkpoint.
@@ -23,12 +23,8 @@ export function getSessionActivity(root: string, slug: string): SessionActivity 
       ORDER BY e.id DESC LIMIT 1
     `).get(slug) as { timestamp: string } | undefined;
 
-    const since = sessionStart?.timestamp ?? null;
+    if (!sessionStart) return { toolUseCount: 0, filesModified: [], filesCreated: [] };
 
-    if (!since) {
-      db.close();
-      return { toolUseCount: 0, filesModified: [], filesCreated: [], since: null };
-    }
 
     const rows = db.prepare(`
       SELECT e.type, e.payload_json FROM events e
@@ -37,9 +33,7 @@ export function getSessionActivity(root: string, slug: string): SessionActivity 
         AND e.type = 'post_tool_use'
         AND e.timestamp > ?
       ORDER BY e.id ASC
-    `).all(slug, since) as { type: string; payload_json: string | null }[];
-
-    db.close();
+    `).all(slug, sessionStart.timestamp) as { type: string; payload_json: string | null }[];
 
     const filesModified: string[] = [];
     const filesCreated: string[] = [];
@@ -57,9 +51,11 @@ export function getSessionActivity(root: string, slug: string): SessionActivity 
       } catch { /* skip malformed */ }
     }
 
-    return { toolUseCount: rows.length, filesModified, filesCreated, since };
+    return { toolUseCount: rows.length, filesModified, filesCreated };
   } catch {
-    return { toolUseCount: 0, filesModified: [], filesCreated: [], since: null };
+    return { toolUseCount: 0, filesModified: [], filesCreated: [] };
+  } finally {
+    db?.close();
   }
 }
 

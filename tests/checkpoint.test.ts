@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, existsSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { openDb } from "../src/core/db.js";
 import { appendEvent } from "../src/core/events.js";
+import { writeActiveJob } from "../src/core/active-job.js";
 
 const CLI = join(dirname(fileURLToPath(import.meta.url)), "../dist/cli/index.js");
 
@@ -211,6 +212,110 @@ test("checkpoint apply is blocked by stale lifecycle event", () => {
     const result = cli(["checkpoint", "apply", "--slug", slug], root);
     assert.notEqual(result.status, 0, "apply should fail when draft is stale");
     assert.ok(result.stderr.includes("stale"), "error should mention stale");
+  } finally {
+    rmSync(root, { recursive: true });
+  }
+});
+
+// --- auto-draft on stop ---
+
+test("stop hook auto-creates draft when tool activity exists", () => {
+  const root = makeTmp();
+  try {
+    initProject(root);
+    const slug = "my-test-job";
+    const jobId = initJob(root, slug);
+
+    writeActiveJob(root, { job_id: jobId, slug });
+    appendEvent(root, "session_start", { job_id: jobId, slug }, "session started");
+    appendEvent(root, "post_tool_use", { job_id: jobId, slug }, "edit",
+      JSON.stringify({ tool_name: "Edit", path: "src/cli/hook.ts" }));
+
+    const result = cli(["hook", "stop"], root);
+    assert.equal(result.status, 0, `hook stop failed: ${result.stderr}`);
+
+    const pending = join(root, "continuity", "jobs", slug, "pending");
+    const drafts = readdirSync(pending).filter(f => f.startsWith("checkpoint-") && f.endsWith(".md"));
+    assert.equal(drafts.length, 1, "should have one auto-generated draft");
+
+    const content = readFileSync(join(pending, drafts[0]), "utf8");
+    assert.ok(content.includes("auto_generated: true"), "draft should be marked auto-generated");
+    assert.ok(content.includes("src/cli/hook.ts"), "draft should list the edited file");
+  } finally {
+    rmSync(root, { recursive: true });
+  }
+});
+
+test("stop hook preserves existing HANDOFF current state in draft", () => {
+  const root = makeTmp();
+  try {
+    initProject(root);
+    const slug = "my-test-job";
+    const jobId = initJob(root, slug);
+
+    // Write a meaningful current state to HANDOFF
+    const handoffPath = join(root, "continuity", "jobs", slug, "HANDOFF.md");
+    const handoff = readFileSync(handoffPath, "utf8");
+    writeFileSync(handoffPath, handoff.replace(
+      /## Current state[\s\S]*?(?=\n## )/,
+      "## Current state\n\nAll three subcommands are working.\n\n"
+    ));
+
+    writeActiveJob(root, { job_id: jobId, slug });
+    appendEvent(root, "session_start", { job_id: jobId, slug }, "session started");
+    appendEvent(root, "post_tool_use", { job_id: jobId, slug }, "edit",
+      JSON.stringify({ tool_name: "Edit", path: "src/core/db.ts" }));
+
+    cli(["hook", "stop"], root);
+
+    const pending = join(root, "continuity", "jobs", slug, "pending");
+    const drafts = readdirSync(pending).filter(f => f.startsWith("checkpoint-") && f.endsWith(".md"));
+    const content = readFileSync(join(pending, drafts[0]), "utf8");
+
+    assert.ok(content.includes("All three subcommands are working."), "existing state should be preserved");
+    assert.ok(content.includes("src/core/db.ts"), "session log should be appended");
+  } finally {
+    rmSync(root, { recursive: true });
+  }
+});
+
+test("stop hook does not overwrite existing pending draft", () => {
+  const root = makeTmp();
+  try {
+    initProject(root);
+    const slug = "my-test-job";
+    const jobId = initJob(root, slug);
+    const existingDraftPath = makeDraft(root, slug);
+
+    writeActiveJob(root, { job_id: jobId, slug });
+    appendEvent(root, "session_start", { job_id: jobId, slug }, "session started");
+    appendEvent(root, "post_tool_use", { job_id: jobId, slug }, "edit",
+      JSON.stringify({ tool_name: "Edit", path: "src/cli/hook.ts" }));
+
+    cli(["hook", "stop"], root);
+
+    const pending = join(root, "continuity", "jobs", slug, "pending");
+    const drafts = readdirSync(pending).filter(f => f.startsWith("checkpoint-") && f.endsWith(".md"));
+    assert.equal(drafts.length, 1, "should still have exactly one draft (no overwrite)");
+    assert.ok(existsSync(existingDraftPath), "original draft should be untouched");
+  } finally {
+    rmSync(root, { recursive: true });
+  }
+});
+
+test("session_start hook notifies about pending draft", () => {
+  const root = makeTmp();
+  try {
+    initProject(root);
+    const slug = "my-test-job";
+    const jobId = initJob(root, slug);
+    writeActiveJob(root, { job_id: jobId, slug });
+    makeDraft(root, slug);
+
+    const result = cli(["hook", "session-start"], root);
+    assert.equal(result.status, 0);
+    assert.ok(result.stdout.includes("checkpoint draft is pending"), "should notify about pending draft");
+    assert.ok(result.stdout.includes("checkpoint apply"), "should suggest apply command");
   } finally {
     rmSync(root, { recursive: true });
   }

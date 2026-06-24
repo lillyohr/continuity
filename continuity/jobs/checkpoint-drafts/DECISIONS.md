@@ -205,13 +205,20 @@ read time. The `effect` field is the key: it captures meaning when context is
 hot, so assembly at Stop time costs nothing extra.
 
 **Consequences:**
-- V1 (current): PreCompact and explicit triggers only. Synthesis-on-read via
-  `checkpoint draft`. Stop hook records an event but does not checkpoint.
-- V2: Stop hook triggers lightweight assembly checkpoint. PostToolUse payloads
-  include `effect` field populated during the session. `checkpoint draft` becomes
-  fallback for the assembly path only.
-- The `effect` field must be added to `src/cli/hook.ts` PostToolUse payload
-  extraction and to `plugin/hooks/scripts/post-tool-use.js`.
+- V1 (implemented): Stop hook auto-writes a structural draft to `pending/` from
+  PostToolUse event payloads (file paths only, no model call). Draft is marked
+  `auto_generated: true` and appends a session log to the existing "Current
+  state" rather than replacing it. An existing unapplied draft is never
+  overwritten. SessionStart notifies when a pending draft exists.
+  PreCompact and explicit `checkpoint draft` remain available for full
+  synthesis-on-read when higher-quality context is needed.
+  Known limitation: repeated auto-apply cycles accumulate session log lines in
+  "Current state"; a periodic `checkpoint draft` (synthesis) is the intended
+  cleanup path.
+- V2: PostToolUse payloads gain a semantic `effect` field (populated during the
+  session while context is hot), enabling Stop-triggered assembly that captures
+  meaning rather than just file paths. `checkpoint draft` becomes the fallback
+  for the assembly path only.
 
 **Applies to:** `plugin/hooks/scripts/stop.js`, `plugin/hooks/scripts/post-tool-use.js`,
 `src/cli/hook.ts`, future checkpoint assembly logic.
