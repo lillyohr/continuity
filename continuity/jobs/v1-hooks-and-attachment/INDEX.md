@@ -12,7 +12,7 @@ This is the entry point for this job.
 
 ## Current status
 
-active
+active — Hooks and SQLite complete. Refining payload_json (DEC-006), then Checkpoint Drafts.
 
 ## Files
 

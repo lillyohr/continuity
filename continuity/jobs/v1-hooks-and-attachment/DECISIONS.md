@@ -133,6 +133,49 @@ all hook scripts in `plugin/hooks/scripts/`
 
 ---
 
+## DEC-006 — Hook payloads are bounded references, not content
+
+**Status:** accepted
+
+**Date:** 2026-06-23
+
+**Decision:** `payload_json` in the `events` table is intentionally bounded to
+2KB max. Hook scripts store references and small facts, never full content.
+
+Per-event schemas:
+- `session_start` — `{}` (nothing useful in payload yet)
+- `stop` — `{}` (nothing useful)
+- `pre_compact` — `{ "conversation_tokens_estimate": N }`
+- `post_tool_use` — `{ "tool_name": "Edit", "path": "src/core/db.ts" }`
+
+Never store: full tool output, full file contents, full user/assistant messages,
+full command output, large logs. Store instead: file path, command name, event
+type, small summary, byte count, hash, or first/last N chars if essential.
+
+`appendEvent` enforces the budget with a size guard: if the serialized payload
+exceeds 2048 bytes, it is replaced with `{ "_truncated": true }`.
+
+**Why:** Storing full outputs would make the DB large quickly, potentially
+capture sensitive content, and add no checkpoint quality benefit. The session
+context already holds the full output; hooks capture the signal (what happened),
+not the substance (what the output said). This keeps the events table as a fast,
+lean index — the input to future checkpoint scoring, not a transcript.
+
+**Consequences:** Hook scripts must be updated to extract structured facts from
+the Claude Code stdin payload rather than passing it through raw. `appendEvent`
+needs the 2KB size guard. The `post_tool_use` summary in `hook.ts` should
+include a path field where derivable.
+
+**Applies to:** `src/core/events.ts`, `src/cli/hook.ts`,
+`plugin/hooks/scripts/post-tool-use.js`,
+`plugin/hooks/scripts/pre-compact.js`
+
+**Supersedes:** none
+
+**Superseded by:** none
+
+---
+
 ## DEC-005 — PreCompact initiates checkpoint, not suggests it
 
 **Status:** accepted
