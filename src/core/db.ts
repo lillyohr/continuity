@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { mkdirSync, readFileSync } from "node:fs";
-import { join, dirname } from "node:path";
+import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stateDir } from "./paths.js";
 
@@ -12,6 +12,24 @@ const MIGRATIONS: { version: number; file: string }[] = [
   { version: 2, file: "002_checkpoints.sql" },
 ];
 
+const _cache = new Map<string, Database.Database>();
+
+/**
+ * Return a cached connection for this project root. Migrations run once on
+ * first open. Do NOT call db.close() on the returned instance — the connection
+ * is reused for the lifetime of the process.
+ */
+export function getDb(projectRoot: string): Database.Database {
+  const key = resolve(projectRoot);
+  let db = _cache.get(key);
+  if (!db || !db.open) {
+    db = openDb(projectRoot);
+    _cache.set(key, db);
+  }
+  return db;
+}
+
+/** Open a fresh connection with migrations applied. Caller owns the close. */
 export function openDb(projectRoot: string): Database.Database {
   const dir = stateDir(projectRoot);
   mkdirSync(dir, { recursive: true });

@@ -4,7 +4,7 @@ import { Command } from "commander";
 import { continuityDir } from "../core/paths.js";
 import { listJobs } from "../core/context-pack.js";
 import { readActiveJob } from "../core/active-job.js";
-import { openDb } from "../core/db.js";
+import { getDb } from "../core/db.js";
 
 export function registerStatusCommand(program: Command): void {
   program
@@ -29,7 +29,7 @@ export function registerStatusCommand(program: Command): void {
         console.log(`Since:    ${active.attached_at}`);
 
         try {
-          const db = openDb(root);
+          const db = getDb(root);
 
           const eventCount = (
             db.prepare(`SELECT COUNT(*) as n FROM events WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?)`).get(active.slug) as { n: number }
@@ -42,8 +42,6 @@ export function registerStatusCommand(program: Command): void {
           const sessionCount = (
             db.prepare(`SELECT COUNT(*) as n FROM sessions WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?)`).get(active.slug) as { n: number }
           ).n;
-
-          db.close();
 
           if (eventCount > 0) {
             console.log(`Activity: ${eventCount} event${eventCount === 1 ? "" : "s"} across ${sessionCount} session${sessionCount === 1 ? "" : "s"}`);

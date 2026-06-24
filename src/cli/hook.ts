@@ -5,7 +5,7 @@ import { readActiveJob } from "../core/active-job.js";
 import { appendEvent, type EventType } from "../core/events.js";
 import { pendingDir } from "../core/paths.js";
 import { buildAutoCheckpointDraft, hasPendingDraft, getSessionActivity, type SessionActivity } from "../core/session-summary.js";
-import { openDb } from "../core/db.js";
+import { getDb } from "../core/db.js";
 
 const HOOK_EVENTS: Record<string, EventType> = {
   "session-start": "session_start",
@@ -55,18 +55,17 @@ function tryWriteAutoCheckpoint(root: string, slug: string, jobId: string, activ
     const date = generatedAt.slice(0, 10);
     const time = generatedAt.slice(11, 16).replace(":", "");
     const filename = `checkpoint-${date}-${time}.md`;
+
+    // Stamp SQLite BEFORE writing the file (DEC-005): the file write triggers a
+    // PostToolUse event — if we stamped after, that event would postdate generated_at
+    // and immediately mark the draft stale.
+    getDb(root).prepare(
+      `INSERT INTO checkpoints (job_id, generated_at, draft_path)
+       VALUES ((SELECT job_id FROM jobs WHERE slug = ?), ?, ?)`
+    ).run(slug, generatedAt, `continuity/jobs/${slug}/pending/${filename}`);
+
     const draftContent = buildAutoCheckpointDraft(root, slug, jobId, generatedAt, activity);
     writeFileSync(`${dir}/${filename}`, draftContent);
-
-    const db = openDb(root);
-    try {
-      db.prepare(
-        `INSERT INTO checkpoints (job_id, generated_at, draft_path)
-         VALUES ((SELECT job_id FROM jobs WHERE slug = ?), ?, ?)`
-      ).run(slug, generatedAt, `continuity/jobs/${slug}/pending/${filename}`);
-    } finally {
-      db.close();
-    }
   } catch { /* non-fatal — never block session stop */ }
 }
 

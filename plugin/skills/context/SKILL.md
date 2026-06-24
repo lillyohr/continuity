@@ -45,5 +45,7 @@ continuity init [path]           Initialize in a project (default: cwd)
 continuity start "<job name>"    Create a new job
 continuity status                Show attached/unattached state and known jobs
 continuity resume <slug>         Print resume instruction for a job
-continuity checkpoint [slug]     Print checkpoint instruction for a job
+continuity checkpoint draft <slug>   Generate a checkpoint draft (synthesis prompt)
+continuity checkpoint apply          Apply the pending draft to the context pack
+continuity checkpoint ignore         Dismiss the pending draft without applying
 ```

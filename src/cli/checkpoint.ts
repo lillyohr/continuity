@@ -3,7 +3,7 @@ import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from
 import { Command } from "commander";
 import { continuityDir, jobDir, pendingDir } from "../core/paths.js";
 import { listJobs } from "../core/context-pack.js";
-import { openDb } from "../core/db.js";
+import { getDb } from "../core/db.js";
 
 export function registerCheckpointCommand(program: Command): void {
   const checkpoint = program
@@ -33,12 +33,10 @@ export function registerCheckpointCommand(program: Command): void {
       // generated_at is stamped NOW so events from the Write tool that
       // creates the draft file don't postdate it.
       try {
-        const db = openDb(root);
-        db.prepare(
+        getDb(root).prepare(
           `INSERT INTO checkpoints (job_id, generated_at, draft_path)
            VALUES ((SELECT job_id FROM jobs WHERE slug = ?), ?, ?)`
         ).run(resolvedSlug, generatedAt, draftPath);
-        db.close();
       } catch { /* non-fatal */ }
 
       const pendingDraft = findPendingDraft(root, resolvedSlug);
@@ -170,6 +168,15 @@ export function registerCheckpointCommand(program: Command): void {
       if (checkpoint) markCheckpointApplied(root, checkpoint.id);
       unlinkSync(draftPath);
       console.log(`Applied and removed: ${basename(draftPath)}`);
+
+      // Clean up any orphaned pending drafts (e.g. a second explicit draft was
+      // generated before this one was applied). Mark their rows dismissed too.
+      const orphans = findAllPendingDrafts(root, resolvedSlug);
+      if (orphans.length > 0) {
+        dismissAllPendingCheckpoints(root, resolvedSlug);
+        for (const p of orphans) { try { unlinkSync(p); } catch { /* best effort */ } }
+        console.log(`Cleaned up ${orphans.length} orphaned draft${orphans.length === 1 ? "" : "s"}`);
+      }
     });
 
   checkpoint
@@ -182,14 +189,14 @@ export function registerCheckpointCommand(program: Command): void {
       requireInit(root);
       const resolvedSlug = resolveSlug(root, opts.slug, "checkpoint ignore --slug");
 
-      const draftPath = findPendingDraft(root, resolvedSlug);
-      if (!draftPath) {
+      const drafts = findAllPendingDrafts(root, resolvedSlug);
+      if (drafts.length === 0) {
         console.log(`No pending draft for job: ${resolvedSlug}`);
         return;
       }
-      markCheckpointDismissed(root, resolvedSlug);
-      unlinkSync(draftPath);
-      console.log(`Dismissed: ${basename(draftPath)}`);
+      dismissAllPendingCheckpoints(root, resolvedSlug);
+      for (const p of drafts) unlinkSync(p);
+      console.log(`Dismissed: ${drafts.map(p => basename(p)).join(", ")}`);
     });
 }
 
@@ -243,25 +250,28 @@ function draftFilename(): string {
   return `checkpoint-${date}-${time}.md`;
 }
 
-function findPendingDraft(root: string, slug: string): string | null {
+function findAllPendingDrafts(root: string, slug: string): string[] {
   const dir = pendingDir(root, slug);
-  if (!existsSync(dir)) return null;
-  const files = readdirSync(dir)
+  if (!existsSync(dir)) return [];
+  return readdirSync(dir)
     .filter(f => f.startsWith("checkpoint-") && f.endsWith(".md"))
     .sort()
-    .reverse();
-  return files.length > 0 ? join(dir, files[0]) : null;
+    .reverse()
+    .map(f => join(dir, f));
+}
+
+function findPendingDraft(root: string, slug: string): string | null {
+  const all = findAllPendingDrafts(root, slug);
+  return all.length > 0 ? all[0] : null;
 }
 
 function getRecentEvents(root: string, slug: string): string {
   try {
-    const db = openDb(root);
-    const rows = db.prepare(`
+    const rows = getDb(root).prepare(`
       SELECT e.timestamp, e.type, e.summary, e.payload_json
       FROM events e JOIN jobs j ON e.job_id = j.job_id
       WHERE j.slug = ? ORDER BY e.id DESC LIMIT 50
     `).all(slug) as { timestamp: string; type: string; summary: string; payload_json: string | null }[];
-    db.close();
     if (rows.length === 0) return "No recorded events.";
     return rows.reverse().map(r => {
       const p = r.payload_json ? ` ${r.payload_json}` : "";
@@ -274,14 +284,12 @@ function getRecentEvents(root: string, slug: string): string {
 
 function getLatestCheckpoint(root: string, slug: string): { id: number; generated_at: string } | null {
   try {
-    const db = openDb(root);
-    const row = db.prepare(`
+    const row = getDb(root).prepare(`
       SELECT c.id, c.generated_at FROM checkpoints c
       JOIN jobs j ON c.job_id = j.job_id
       WHERE j.slug = ? AND c.applied_at IS NULL AND c.dismissed_at IS NULL
       ORDER BY c.id DESC LIMIT 1
     `).get(slug) as { id: number; generated_at: string } | undefined;
-    db.close();
     return row ?? null;
   } catch {
     return null;
@@ -290,15 +298,13 @@ function getLatestCheckpoint(root: string, slug: string): { id: number; generate
 
 function getLatestLifecycleEventTimestamp(root: string, slug: string, after: string): string | null {
   try {
-    const db = openDb(root);
-    const row = db.prepare(`
+    const row = getDb(root).prepare(`
       SELECT e.timestamp FROM events e JOIN jobs j ON e.job_id = j.job_id
       WHERE j.slug = ?
         AND e.type IN ('session_start', 'stop', 'pre_compact')
         AND e.timestamp > ?
       ORDER BY e.id DESC LIMIT 1
     `).get(slug, after) as { timestamp: string } | undefined;
-    db.close();
     return row?.timestamp ?? null;
   } catch {
     return null;
@@ -307,25 +313,19 @@ function getLatestLifecycleEventTimestamp(root: string, slug: string, after: str
 
 function markCheckpointApplied(root: string, id: number): void {
   try {
-    const db = openDb(root);
-    db.prepare(`UPDATE checkpoints SET applied_at = ? WHERE id = ?`)
+    getDb(root).prepare(`UPDATE checkpoints SET applied_at = ? WHERE id = ?`)
       .run(new Date().toISOString(), id);
-    db.close();
   } catch { /* non-fatal */ }
 }
 
-function markCheckpointDismissed(root: string, slug: string): void {
+function dismissAllPendingCheckpoints(root: string, slug: string): void {
   try {
-    const db = openDb(root);
-    db.prepare(`
+    getDb(root).prepare(`
       UPDATE checkpoints SET dismissed_at = ?
-      WHERE id = (
-        SELECT c.id FROM checkpoints c JOIN jobs j ON c.job_id = j.job_id
-        WHERE j.slug = ? AND c.applied_at IS NULL AND c.dismissed_at IS NULL
-        ORDER BY c.id DESC LIMIT 1
-      )
+      WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?)
+        AND applied_at IS NULL
+        AND dismissed_at IS NULL
     `).run(new Date().toISOString(), slug);
-    db.close();
   } catch { /* non-fatal */ }
 }
 

@@ -1,7 +1,7 @@
 import { appendFileSync, readFileSync, renameSync, mkdirSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 import { eventsPath } from "./paths.js";
-import { openDb } from "./db.js";
+import { getDb } from "./db.js";
 
 export type EventType = "session_start" | "stop" | "pre_compact" | "post_tool_use";
 
@@ -28,7 +28,7 @@ export function appendEvent(
   const timestamp = new Date().toISOString();
 
   try {
-    const db = openDb(projectRoot);
+    const db = getDb(projectRoot);
     importJsonlIfPresent(db, projectRoot);
     if (job) {
       db.prepare(
@@ -40,7 +40,6 @@ export function appendEvent(
       `INSERT INTO events (timestamp, type, job_id, slug, summary, payload_json)
        VALUES (?, ?, ?, ?, ?, ?)`
     ).run(timestamp, type, job?.job_id ?? null, job?.slug ?? null, summary, payloadJson ?? null);
-    db.close();
   } catch {
     // fallback: append to JSONL so no event is lost
     const event: HookEvent = {
@@ -63,7 +62,7 @@ export type EventSummary = {
 
 export function readEvents(projectRoot: string): EventSummary {
   try {
-    const db = openDb(projectRoot);
+    const db = getDb(projectRoot);
     importJsonlIfPresent(db, projectRoot);
 
     const count = (
@@ -74,7 +73,6 @@ export function readEvents(projectRoot: string): EventSummary {
       .prepare(`SELECT * FROM events ORDER BY id DESC LIMIT 1`)
       .get() as (HookEvent & { id: number }) | undefined;
 
-    db.close();
     return {
       count,
       last: last

@@ -5,13 +5,21 @@ import { Command } from "commander";
 import { continuityDir, jobDir } from "../core/paths.js";
 import { writeActiveJob } from "../core/active-job.js";
 import { listJobs } from "../core/context-pack.js";
-import { openDb } from "../core/db.js";
+import { getDb } from "../core/db.js";
 
-function readJobId(projectRoot: string, slug: string): string | null {
-  const indexPath = join(jobDir(projectRoot, slug), "INDEX.md");
-  if (!existsSync(indexPath)) return null;
-  const match = readFileSync(indexPath, "utf8").match(/^job_id:\s*"?([^"\n]+)"?/m);
-  return match ? match[1].trim() : null;
+function readJobId(root: string, slug: string): string | null {
+  const indexPath = join(jobDir(root, slug), "INDEX.md");
+  if (existsSync(indexPath)) {
+    const match = readFileSync(indexPath, "utf8").match(/^job_id:\s*"?([^"\n]+)"?/m);
+    if (match) return match[1].trim();
+  }
+  // INDEX.md missing or malformed — check SQLite before falling back to slug
+  try {
+    const row = getDb(root).prepare(`SELECT job_id FROM jobs WHERE slug = ?`).get(slug) as { job_id: string } | undefined;
+    return row?.job_id ?? null;
+  } catch {
+    return null;
+  }
 }
 
 export function registerAttachCommand(program: Command): void {
@@ -39,7 +47,7 @@ export function registerAttachCommand(program: Command): void {
       writeActiveJob(root, { job_id: jobId, slug });
 
       try {
-        const db = openDb(root);
+        const db = getDb(root);
         // ensure job row exists (may have been created before SQLite was added)
         db.prepare(
           `INSERT OR IGNORE INTO jobs (job_id, slug, title, created_at, status)
@@ -48,7 +56,6 @@ export function registerAttachCommand(program: Command): void {
         db.prepare(
           `INSERT INTO sessions (job_id, started_at) VALUES (?, ?)`
         ).run(jobId, new Date().toISOString());
-        db.close();
       } catch {
         // non-fatal: active-job.json is the source of truth for attachment
       }

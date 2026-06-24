@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 import { Command } from "commander";
 import { readActiveJob, clearActiveJob } from "../core/active-job.js";
-import { openDb } from "../core/db.js";
+import { getDb } from "../core/db.js";
 
 export function registerDetachCommand(program: Command): void {
   program
@@ -20,13 +20,11 @@ export function registerDetachCommand(program: Command): void {
       clearActiveJob(root);
 
       try {
-        const db = openDb(root);
-        db.prepare(
+        getDb(root).prepare(
           `UPDATE sessions SET ended_at = ?
            WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?)
              AND ended_at IS NULL`
         ).run(new Date().toISOString(), active.slug);
-        db.close();
       } catch {
         // non-fatal
       }
