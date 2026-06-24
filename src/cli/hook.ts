@@ -1,7 +1,11 @@
 import { resolve } from "node:path";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { Command } from "commander";
 import { readActiveJob } from "../core/active-job.js";
 import { appendEvent, type EventType } from "../core/events.js";
+import { pendingDir } from "../core/paths.js";
+import { buildAutoCheckpointDraft, hasPendingDraft, getSessionActivity } from "../core/session-summary.js";
+import { openDb } from "../core/db.js";
 
 const HOOK_EVENTS: Record<string, EventType> = {
   "session-start": "session_start",
@@ -38,6 +42,29 @@ function buildPayload(eventType: EventType, payload: Record<string, unknown>): s
   }
 
   return undefined;
+}
+
+function tryWriteAutoCheckpoint(root: string, slug: string, jobId: string): void {
+  try {
+    if (hasPendingDraft(root, slug)) return; // don't overwrite an existing unapplied draft
+
+    const generatedAt = new Date().toISOString();
+    const dir = pendingDir(root, slug);
+    mkdirSync(dir, { recursive: true });
+
+    const date = generatedAt.slice(0, 10);
+    const time = generatedAt.slice(11, 16).replace(":", "");
+    const filename = `checkpoint-${date}-${time}.md`;
+    const draftContent = buildAutoCheckpointDraft(root, slug, jobId, generatedAt);
+    writeFileSync(`${dir}/${filename}`, draftContent);
+
+    const db = openDb(root);
+    db.prepare(
+      `INSERT INTO checkpoints (job_id, generated_at, draft_path)
+       VALUES ((SELECT job_id FROM jobs WHERE slug = ?), ?, ?)`
+    ).run(slug, generatedAt, `continuity/jobs/${slug}/pending/${filename}`);
+    db.close();
+  } catch { /* non-fatal — never block session stop */ }
 }
 
 function deriveToolPath(toolName: string, toolInput: unknown): string | null {
@@ -87,12 +114,25 @@ export function registerHookCommand(program: Command): void {
 
       if (eventType === "session_start") {
         if (job) {
-          process.stdout.write(`Continuity: attached to ${job.slug}. Run \`continuity resume ${job.slug}\` to load context.\n`);
+          let msg = `Continuity: attached to ${job.slug}. Run \`continuity resume ${job.slug}\` to load context.\n`;
+          if (hasPendingDraft(root, job.slug)) {
+            msg += `[CONTINUITY] A checkpoint draft is pending from your last session.\n`;
+            msg += `  Apply: continuity checkpoint apply --slug ${job.slug}\n`;
+            msg += `  Discard: continuity checkpoint ignore --slug ${job.slug}\n`;
+          }
+          process.stdout.write(msg);
         }
       }
 
       if (eventType === "pre_compact" && job) {
         process.stdout.write(`[CONTINUITY] Job "${job.slug}" has unsaved activity. Run \`continuity checkpoint draft ${job.slug}\` now before this compaction proceeds.\n`);
+      }
+
+      if (eventType === "stop" && job) {
+        const activity = getSessionActivity(root, job.slug);
+        if (activity.toolUseCount > 0) {
+          tryWriteAutoCheckpoint(root, job.slug, job.job_id);
+        }
       }
     });
 }
