@@ -1,6 +1,6 @@
 import { readFileSync, mkdirSync, writeFileSync, readdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { jobDir, jobsDir, pendingDir, templatesDir } from "./paths.js";
+import { jobDir, jobsDir, templatesDir } from "./paths.js";
 import { render, type TemplateVars } from "./markdown.js";
 
 const TEMPLATE_FILES = ["INDEX.md", "HANDOFF.md", "DECISIONS.md", "ARTIFACTS.md"] as const;
@@ -30,7 +30,6 @@ export function createContextPack(input: CreateContextPackInput): void {
   };
 
   mkdirSync(dir, { recursive: true });
-  mkdirSync(pendingDir(projectRoot, slug), { recursive: true });
 
   for (const file of TEMPLATE_FILES) {
     const tpl = readFileSync(join(tplDir, file), "utf8");

@@ -17,10 +17,6 @@ export function jobDir(projectRoot: string, slug: string): string {
   return join(jobsDir(projectRoot), slug);
 }
 
-export function pendingDir(projectRoot: string, slug: string): string {
-  return join(jobDir(projectRoot, slug), "pending");
-}
-
 export function stateDir(projectRoot: string): string {
   return join(continuityDir(projectRoot), STATE_DIR);
 }
