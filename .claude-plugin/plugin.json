@@ -5,7 +5,7 @@
   "version": "0.0.0",
   "author": {
     "name": "Lilly Ohr",
-    "url": "https://github.com/ljohr/continuity"
+    "url": "https://github.com/lillyohr/continuity"
   },
   "commands": "plugin/commands",
   "skills": "plugin/skills",

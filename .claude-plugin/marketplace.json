@@ -1,6 +1,17 @@
 {
-  "name": "Continuity",
-  "description": "Keep AI-assisted software work coherent across sessions with job-scoped checkpoints and handoffs.",
-  "category": "productivity",
-  "tags": ["handoff", "resume", "checkpoint", "ai-coding", "sessions"]
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "continuity",
+  "description": "Claude Code plugin that remembers your work across sessions.",
+  "owner": {
+    "name": "Lilly Ohr",
+    "url": "https://github.com/lillyohr"
+  },
+  "plugins": [
+    {
+      "name": "continuity",
+      "description": "Preserves job state across Claude sessions via structured context packs and automatic HANDOFF sync.",
+      "source": "./",
+      "category": "productivity"
+    }
+  ]
 }
