@@ -4,7 +4,7 @@ import { Command } from "commander";
 import { readActiveJob } from "../core/active-job.js";
 import { appendEvent, type EventType } from "../core/events.js";
 import { pendingDir } from "../core/paths.js";
-import { buildAutoCheckpointDraft, hasPendingDraft, getSessionActivity } from "../core/session-summary.js";
+import { buildAutoCheckpointDraft, hasPendingDraft, getSessionActivity, type SessionActivity } from "../core/session-summary.js";
 import { openDb } from "../core/db.js";
 
 const HOOK_EVENTS: Record<string, EventType> = {
@@ -44,7 +44,7 @@ function buildPayload(eventType: EventType, payload: Record<string, unknown>): s
   return undefined;
 }
 
-function tryWriteAutoCheckpoint(root: string, slug: string, jobId: string): void {
+function tryWriteAutoCheckpoint(root: string, slug: string, jobId: string, activity: SessionActivity): void {
   try {
     if (hasPendingDraft(root, slug)) return; // don't overwrite an existing unapplied draft
 
@@ -55,15 +55,18 @@ function tryWriteAutoCheckpoint(root: string, slug: string, jobId: string): void
     const date = generatedAt.slice(0, 10);
     const time = generatedAt.slice(11, 16).replace(":", "");
     const filename = `checkpoint-${date}-${time}.md`;
-    const draftContent = buildAutoCheckpointDraft(root, slug, jobId, generatedAt);
+    const draftContent = buildAutoCheckpointDraft(root, slug, jobId, generatedAt, activity);
     writeFileSync(`${dir}/${filename}`, draftContent);
 
     const db = openDb(root);
-    db.prepare(
-      `INSERT INTO checkpoints (job_id, generated_at, draft_path)
-       VALUES ((SELECT job_id FROM jobs WHERE slug = ?), ?, ?)`
-    ).run(slug, generatedAt, `continuity/jobs/${slug}/pending/${filename}`);
-    db.close();
+    try {
+      db.prepare(
+        `INSERT INTO checkpoints (job_id, generated_at, draft_path)
+         VALUES ((SELECT job_id FROM jobs WHERE slug = ?), ?, ?)`
+      ).run(slug, generatedAt, `continuity/jobs/${slug}/pending/${filename}`);
+    } finally {
+      db.close();
+    }
   } catch { /* non-fatal — never block session stop */ }
 }
 
@@ -131,7 +134,7 @@ export function registerHookCommand(program: Command): void {
       if (eventType === "stop" && job) {
         const activity = getSessionActivity(root, job.slug);
         if (activity.toolUseCount > 0) {
-          tryWriteAutoCheckpoint(root, job.slug, job.job_id);
+          tryWriteAutoCheckpoint(root, job.slug, job.job_id, activity);
         }
       }
     });

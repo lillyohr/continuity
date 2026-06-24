@@ -14,24 +14,30 @@ export function getSessionActivity(root: string, slug: string): SessionActivity 
   try {
     const db = openDb(root);
 
-    // Use the most recent applied checkpoint as lower bound; fall back to epoch
-    const lastApplied = db.prepare(`
-      SELECT c.applied_at FROM checkpoints c
-      JOIN jobs j ON c.job_id = j.job_id
-      WHERE j.slug = ? AND c.applied_at IS NOT NULL
-      ORDER BY c.applied_at DESC LIMIT 1
-    `).get(slug) as { applied_at: string } | undefined;
+    // Bound by the current session's start — gives only this session's tool uses,
+    // not accumulated activity from prior sessions without an applied checkpoint.
+    const sessionStart = db.prepare(`
+      SELECT e.timestamp FROM events e
+      JOIN jobs j ON e.job_id = j.job_id
+      WHERE j.slug = ? AND e.type = 'session_start'
+      ORDER BY e.id DESC LIMIT 1
+    `).get(slug) as { timestamp: string } | undefined;
 
-    const since = lastApplied?.applied_at ?? null;
+    const since = sessionStart?.timestamp ?? null;
+
+    if (!since) {
+      db.close();
+      return { toolUseCount: 0, filesModified: [], filesCreated: [], since: null };
+    }
 
     const rows = db.prepare(`
       SELECT e.type, e.payload_json FROM events e
       JOIN jobs j ON e.job_id = j.job_id
       WHERE j.slug = ?
         AND e.type = 'post_tool_use'
-        ${since ? "AND e.timestamp > ?" : ""}
+        AND e.timestamp > ?
       ORDER BY e.id ASC
-    `).all(...(since ? [slug, since] : [slug])) as { type: string; payload_json: string | null }[];
+    `).all(slug, since) as { type: string; payload_json: string | null }[];
 
     db.close();
 
@@ -67,28 +73,20 @@ export function hasPendingDraft(root: string, slug: string): boolean {
   }
 }
 
-export function buildAutoCheckpointDraft(root: string, slug: string, jobId: string, generatedAt: string): string {
-  const activity = getSessionActivity(root, slug);
-
+export function buildAutoCheckpointDraft(root: string, slug: string, jobId: string, generatedAt: string, activity: SessionActivity): string {
   const currentHandoff = readHandoffSection(root, slug, "Current state");
   const nextStep = readHandoffSection(root, slug, "Next step");
   const openQuestions = readHandoffSection(root, slug, "Open questions");
 
-  const lines: string[] = [];
-  lines.push(`Session ended (${generatedAt.slice(0, 10)}).`);
-  if (activity.toolUseCount > 0) {
-    lines.push(`${activity.toolUseCount} tool use(s) recorded.`);
-  }
-  if (activity.filesModified.length > 0) {
-    lines.push(`Files modified: ${activity.filesModified.join(", ")}.`);
-  }
-  if (activity.filesCreated.length > 0) {
-    lines.push(`Files created: ${activity.filesCreated.join(", ")}.`);
-  }
-  if (lines.length === 1) {
-    // No activity beyond the stop event — preserve existing state
-    lines.push(currentHandoff || "No tool activity recorded this session.");
-  }
+  // Build the session log line — appended to existing state, not replacing it.
+  const sessionParts: string[] = [`Session ended (${generatedAt.slice(0, 10)}).`];
+  if (activity.toolUseCount > 0) sessionParts.push(`${activity.toolUseCount} tool use(s).`);
+  if (activity.filesModified.length > 0) sessionParts.push(`Files modified: ${activity.filesModified.join(", ")}.`);
+  if (activity.filesCreated.length > 0) sessionParts.push(`Files created: ${activity.filesCreated.join(", ")}.`);
+  const sessionLog = sessionParts.join(" ");
+
+  // Preserve existing semantic state; append structural session log below it.
+  const currentStateLines = currentHandoff ? `${currentHandoff}\n\n${sessionLog}` : sessionLog;
 
   return [
     `---`,
@@ -102,7 +100,7 @@ export function buildAutoCheckpointDraft(root: string, slug: string, jobId: stri
     ``,
     `### Current state`,
     ``,
-    lines.join(" "),
+    currentStateLines,
     ``,
     `### Next step`,
     ``,
