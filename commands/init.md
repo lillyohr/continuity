@@ -3,16 +3,10 @@ description: Initialize Continuity in a project
 argument-hint: [path]
 ---
 
-Run the following command in the terminal, then confirm success with the user:
+Run in the terminal:
 
-```
-continuity init
-```
-
-If a path argument was provided, pass it:
-
-```
-continuity init <path>
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/cli/index.js" init
 ```
 
-After running, tell the user their next step is `continuity start "<job name>"`.
+If a path argument was provided, append it. After running, tell the user their next step is `continuity:start "<job name>"`.

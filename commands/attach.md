@@ -3,14 +3,16 @@ description: Attach this session to a Continuity job
 argument-hint: <slug>
 ---
 
-Run the following command, replacing `<slug>` with the argument provided:
+If no slug was provided, first run:
 
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/cli/index.js" status
 ```
-continuity attach <slug>
+
+Then ask the user which job to attach to. Once you have the slug:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/cli/index.js" attach <slug>
 ```
 
-If no slug was provided, first run `continuity status` to list available jobs,
-then ask the user which job to attach to.
-
-After attaching, tell the user they are now tracking that job and that hooks
-will record activity against it until they run `continuity detach`.
+After attaching, tell the user that hooks will now auto-sync HANDOFF.md at session end.

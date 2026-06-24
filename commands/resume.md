@@ -1,15 +1,18 @@
 ---
-description: Resume a Continuity job from its resume files
+description: Resume a Continuity job from its context files
 argument-hint: <slug>
 ---
 
-If no slug was provided, run `continuity status` first to show the user
-their jobs, then ask which one to resume.
+If no slug was provided, first run:
 
-Once you have the slug, run:
-
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/cli/index.js" status
 ```
-continuity resume <slug>
+
+Then ask the user which job to resume. Once you have the slug:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/dist/cli/index.js" resume <slug>
 ```
 
 Then follow the printed resume instruction exactly:
