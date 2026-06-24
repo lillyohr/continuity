@@ -39,3 +39,9 @@ export function templatesDir(): string {
   const packageRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
   return join(packageRoot, "plugin", "templates", "context-pack");
 }
+
+/** Absolute path to plugin/templates/hooks/, resolved package-relative. */
+export function hooksTemplateDir(): string {
+  const packageRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
+  return join(packageRoot, "plugin", "templates", "hooks");
+}
