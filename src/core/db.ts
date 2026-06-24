@@ -9,6 +9,7 @@ const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "migrations
 
 const MIGRATIONS: { version: number; file: string }[] = [
   { version: 1, file: "001_initial.sql" },
+  { version: 2, file: "002_checkpoints.sql" },
 ];
 
 export function openDb(projectRoot: string): Database.Database {

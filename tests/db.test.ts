@@ -24,18 +24,20 @@ test("openDb creates tables and runs migration once", () => {
     assert.ok(names.includes("schema_migrations"));
 
     const version = db
-      .prepare(`SELECT version FROM schema_migrations`)
+      .prepare(`SELECT version FROM schema_migrations ORDER BY version`)
       .all() as { version: number }[];
-    assert.equal(version.length, 1);
+    assert.equal(version.length, 2);
     assert.equal(version[0].version, 1);
+    assert.equal(version[1].version, 2);
+    assert.ok(names.includes("checkpoints"));
     db.close();
 
-    // idempotent — second open should not re-apply migration
+    // idempotent — second open should not re-apply migrations
     const db2 = openDb(root);
     const version2 = db2
       .prepare(`SELECT version FROM schema_migrations`)
       .all() as { version: number }[];
-    assert.equal(version2.length, 1);
+    assert.equal(version2.length, 2);
     db2.close();
   } finally {
     rmSync(root, { recursive: true });

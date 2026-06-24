@@ -1,5 +1,5 @@
 import { resolve, join, basename } from "node:path";
-import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, statSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "node:fs";
 import { Command } from "commander";
 import { continuityDir, jobDir, pendingDir } from "../core/paths.js";
 import { listJobs } from "../core/context-pack.js";
@@ -28,6 +28,18 @@ export function registerCheckpointCommand(program: Command): void {
       const generatedAt = new Date().toISOString();
       const filename = draftFilename();
       const draftPath = `${packPath}/pending/${filename}`;
+
+      // Record the checkpoint in SQLite before printing the prompt.
+      // generated_at is stamped NOW so events from the Write tool that
+      // creates the draft file don't postdate it.
+      try {
+        const db = openDb(root);
+        db.prepare(
+          `INSERT INTO checkpoints (job_id, generated_at, draft_path)
+           VALUES ((SELECT job_id FROM jobs WHERE slug = ?), ?, ?)`
+        ).run(resolvedSlug, generatedAt, draftPath);
+        db.close();
+      } catch { /* non-fatal */ }
 
       const pendingDraft = findPendingDraft(root, resolvedSlug);
       const existingDraftNote = pendingDraft
@@ -110,17 +122,20 @@ export function registerCheckpointCommand(program: Command): void {
 
       const draftContent = readFileSync(draftPath, "utf8");
 
-      // stale check: use file mtime so the Write event that created the draft
-      // doesn't falsely trigger staleness (generated_at predates that Write)
-      const draftMtime = new Date(statSync(draftPath).mtimeMs).toISOString();
-      const latestEvent = getLatestEventTimestamp(root, resolvedSlug);
-      if (latestEvent && latestEvent > draftMtime) {
-        console.error(`Error: Draft is stale. New activity occurred after it was written.`);
-        console.error(`  Draft written:   ${draftMtime}`);
-        console.error(`  Latest event:    ${latestEvent}`);
-        console.error(`Re-run: continuity checkpoint draft ${resolvedSlug}`);
-        console.error(`Or discard: continuity checkpoint ignore --slug ${resolvedSlug}`);
-        process.exit(1);
+      // Stale check: use generated_at from the checkpoints table (stamped before
+      // Claude writes the file) and only count lifecycle events — session_start,
+      // stop, pre_compact — not post_tool_use from the checkpoint workflow itself.
+      const checkpoint = getLatestCheckpoint(root, resolvedSlug);
+      if (checkpoint) {
+        const latestLifecycle = getLatestLifecycleEventTimestamp(root, resolvedSlug, checkpoint.generated_at);
+        if (latestLifecycle) {
+          console.error(`Error: Draft is stale. Session activity occurred after it was generated.`);
+          console.error(`  Draft generated: ${checkpoint.generated_at}`);
+          console.error(`  Latest event:    ${latestLifecycle}`);
+          console.error(`Re-run: continuity checkpoint draft ${resolvedSlug}`);
+          console.error(`Or discard: continuity checkpoint ignore --slug ${resolvedSlug}`);
+          process.exit(1);
+        }
       }
 
       const handoffUpdate = parseSection(draftContent, "HANDOFF UPDATE");
@@ -152,6 +167,7 @@ export function registerCheckpointCommand(program: Command): void {
         console.log(`Updated: ARTIFACTS.md`);
       }
 
+      if (checkpoint) markCheckpointApplied(root, checkpoint.id);
       unlinkSync(draftPath);
       console.log(`Applied and removed: ${basename(draftPath)}`);
     });
@@ -171,6 +187,7 @@ export function registerCheckpointCommand(program: Command): void {
         console.log(`No pending draft for job: ${resolvedSlug}`);
         return;
       }
+      markCheckpointDismissed(root, resolvedSlug);
       unlinkSync(draftPath);
       console.log(`Dismissed: ${basename(draftPath)}`);
     });
@@ -255,13 +272,32 @@ function getRecentEvents(root: string, slug: string): string {
   }
 }
 
-function getLatestEventTimestamp(root: string, slug: string): string | null {
+function getLatestCheckpoint(root: string, slug: string): { id: number; generated_at: string } | null {
+  try {
+    const db = openDb(root);
+    const row = db.prepare(`
+      SELECT c.id, c.generated_at FROM checkpoints c
+      JOIN jobs j ON c.job_id = j.job_id
+      WHERE j.slug = ? AND c.applied_at IS NULL AND c.dismissed_at IS NULL
+      ORDER BY c.id DESC LIMIT 1
+    `).get(slug) as { id: number; generated_at: string } | undefined;
+    db.close();
+    return row ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function getLatestLifecycleEventTimestamp(root: string, slug: string, after: string): string | null {
   try {
     const db = openDb(root);
     const row = db.prepare(`
       SELECT e.timestamp FROM events e JOIN jobs j ON e.job_id = j.job_id
-      WHERE j.slug = ? ORDER BY e.id DESC LIMIT 1
-    `).get(slug) as { timestamp: string } | undefined;
+      WHERE j.slug = ?
+        AND e.type IN ('session_start', 'stop', 'pre_compact')
+        AND e.timestamp > ?
+      ORDER BY e.id DESC LIMIT 1
+    `).get(slug, after) as { timestamp: string } | undefined;
     db.close();
     return row?.timestamp ?? null;
   } catch {
@@ -269,9 +305,28 @@ function getLatestEventTimestamp(root: string, slug: string): string | null {
   }
 }
 
-function parseFrontmatter(content: string, key: string): string | null {
-  const match = content.match(new RegExp(`^${key}:\\s*"?([^"\\n]+)"?`, "m"));
-  return match ? match[1].trim() : null;
+function markCheckpointApplied(root: string, id: number): void {
+  try {
+    const db = openDb(root);
+    db.prepare(`UPDATE checkpoints SET applied_at = ? WHERE id = ?`)
+      .run(new Date().toISOString(), id);
+    db.close();
+  } catch { /* non-fatal */ }
+}
+
+function markCheckpointDismissed(root: string, slug: string): void {
+  try {
+    const db = openDb(root);
+    db.prepare(`
+      UPDATE checkpoints SET dismissed_at = ?
+      WHERE id = (
+        SELECT c.id FROM checkpoints c JOIN jobs j ON c.job_id = j.job_id
+        WHERE j.slug = ? AND c.applied_at IS NULL AND c.dismissed_at IS NULL
+        ORDER BY c.id DESC LIMIT 1
+      )
+    `).run(new Date().toISOString(), slug);
+    db.close();
+  } catch { /* non-fatal */ }
 }
 
 function parseSection(content: string, heading: string): string {
