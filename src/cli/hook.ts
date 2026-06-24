@@ -92,7 +92,7 @@ export function registerHookCommand(program: Command): void {
       }
 
       if (eventType === "pre_compact" && job) {
-        process.stdout.write(`[CONTINUITY] Job "${job.slug}" has unsaved activity. Run \`continuity checkpoint ${job.slug}\` now before this compaction proceeds.\n`);
+        process.stdout.write(`[CONTINUITY] Job "${job.slug}" has unsaved activity. Run \`continuity checkpoint draft ${job.slug}\` now before this compaction proceeds.\n`);
       }
     });
 }
