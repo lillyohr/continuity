@@ -25,7 +25,6 @@ export function getSessionActivity(root: string, slug: string): SessionActivity 
 
     if (!sessionStart) return { toolUseCount: 0, filesModified: [], filesCreated: [] };
 
-
     const rows = db.prepare(`
       SELECT e.type, e.payload_json FROM events e
       JOIN jobs j ON e.job_id = j.job_id

@@ -298,6 +298,7 @@ test("stop hook does not overwrite existing pending draft", () => {
     const drafts = readdirSync(pending).filter(f => f.startsWith("checkpoint-") && f.endsWith(".md"));
     assert.equal(drafts.length, 1, "should still have exactly one draft (no overwrite)");
     assert.ok(existsSync(existingDraftPath), "original draft should be untouched");
+    assert.equal(drafts[0], "checkpoint-2026-01-01-0010.md", "surviving draft must be the original, not a new one");
   } finally {
     rmSync(root, { recursive: true });
   }

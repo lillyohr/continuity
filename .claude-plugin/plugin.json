@@ -1,0 +1,54 @@
+{
+  "name": "continuity",
+  "displayName": "Continuity",
+  "description": "Project-scoped continuity layer for AI coding sessions. Preserves job state across Claude conversations via structured context packs and automatic session checkpoints.",
+  "version": "0.0.0",
+  "author": {
+    "name": "Lilly Ohr",
+    "url": "https://github.com/ljohr/continuity"
+  },
+  "commands": "plugin/commands",
+  "skills": "plugin/skills",
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/plugin/hooks/scripts/session-start.js\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/plugin/hooks/scripts/stop.js\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/plugin/hooks/scripts/pre-compact.js\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/plugin/hooks/scripts/post-tool-use.js\""
+          }
+        ]
+      }
+    ]
+  }
+}
