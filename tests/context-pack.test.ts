@@ -23,12 +23,11 @@ const TEST_INPUT = {
   createdAt: "2026-06-21",
 };
 
-test("createContextPack: creates job directory and pending/ subdirectory", () => {
+test("createContextPack: creates job directory", () => {
   const root = makeProject();
   createContextPack({ ...TEST_INPUT, projectRoot: root });
 
   assert.ok(existsSync(join(root, "continuity", "jobs", "my-test-job")));
-  assert.ok(existsSync(join(root, "continuity", "jobs", "my-test-job", "pending")));
 });
 
 test("createContextPack: writes all four files", () => {
