@@ -1,5 +1,5 @@
 import { resolve, join, basename } from "node:path";
-import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, readdirSync, unlinkSync, statSync } from "node:fs";
 import { Command } from "commander";
 import { continuityDir, jobDir, pendingDir } from "../core/paths.js";
 import { listJobs } from "../core/context-pack.js";
@@ -109,19 +109,18 @@ export function registerCheckpointCommand(program: Command): void {
       }
 
       const draftContent = readFileSync(draftPath, "utf8");
-      const generatedAt = parseFrontmatter(draftContent, "generated_at");
 
-      // stale check
-      if (generatedAt) {
-        const latestEvent = getLatestEventTimestamp(root, resolvedSlug);
-        if (latestEvent && latestEvent > generatedAt) {
-          console.error(`Error: Draft is stale. New activity occurred after it was generated.`);
-          console.error(`  Draft generated: ${generatedAt}`);
-          console.error(`  Latest event:    ${latestEvent}`);
-          console.error(`Re-run: continuity checkpoint draft ${resolvedSlug}`);
-          console.error(`Or discard: continuity checkpoint ignore --slug ${resolvedSlug}`);
-          process.exit(1);
-        }
+      // stale check: use file mtime so the Write event that created the draft
+      // doesn't falsely trigger staleness (generated_at predates that Write)
+      const draftMtime = new Date(statSync(draftPath).mtimeMs).toISOString();
+      const latestEvent = getLatestEventTimestamp(root, resolvedSlug);
+      if (latestEvent && latestEvent > draftMtime) {
+        console.error(`Error: Draft is stale. New activity occurred after it was written.`);
+        console.error(`  Draft written:   ${draftMtime}`);
+        console.error(`  Latest event:    ${latestEvent}`);
+        console.error(`Re-run: continuity checkpoint draft ${resolvedSlug}`);
+        console.error(`Or discard: continuity checkpoint ignore --slug ${resolvedSlug}`);
+        process.exit(1);
       }
 
       const handoffUpdate = parseSection(draftContent, "HANDOFF UPDATE");
