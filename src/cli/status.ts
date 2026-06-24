@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { existsSync } from "node:fs";
 import { Command } from "commander";
 import { continuityDir } from "../core/paths.js";
-import { listJobs } from "../core/context-pack.js";
+import { listJobs, readJobStatus } from "../core/context-pack.js";
 import { readActiveJob } from "../core/active-job.js";
 import { getDb } from "../core/db.js";
 
@@ -11,7 +11,8 @@ export function registerStatusCommand(program: Command): void {
     .command("status")
     .description("Show Continuity state for this project.")
     .option("-p, --project <path>", "Project root (defaults to current directory)")
-    .action((opts: { project?: string }) => {
+    .option("-a, --all", "Show all jobs including complete ones")
+    .action((opts: { project?: string; all?: boolean }) => {
       const root = resolve(opts.project ?? process.cwd());
 
       if (!existsSync(continuityDir(root))) {
@@ -20,7 +21,10 @@ export function registerStatusCommand(program: Command): void {
       }
 
       const active = readActiveJob(root);
-      const jobs = listJobs(root);
+      const allJobs = listJobs(root);
+      const jobs = opts.all
+        ? allJobs
+        : allJobs.filter((j) => readJobStatus(j.dir) !== "complete");
 
       console.log(`Project:  ${root}`);
 
@@ -31,25 +35,16 @@ export function registerStatusCommand(program: Command): void {
         try {
           const db = getDb(root);
 
-          const eventCount = (
-            db.prepare(`SELECT COUNT(*) as n FROM events WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?)`).get(active.slug) as { n: number }
-          ).n;
+          const session = db.prepare(
+            `SELECT has_edits, stop_sync_requested_at FROM sessions
+             WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?)
+               AND ended_at IS NULL
+             ORDER BY id DESC LIMIT 1`
+          ).get(active.slug) as { has_edits: number; stop_sync_requested_at: string | null } | undefined;
 
-          const lastEvent = db
-            .prepare(`SELECT type, timestamp FROM events WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?) ORDER BY id DESC LIMIT 1`)
-            .get(active.slug) as { type: string; timestamp: string } | undefined;
-
-          const sessionCount = (
-            db.prepare(`SELECT COUNT(*) as n FROM sessions WHERE job_id = (SELECT job_id FROM jobs WHERE slug = ?)`).get(active.slug) as { n: number }
-          ).n;
-
-          if (eventCount > 0) {
-            console.log(`Activity: ${eventCount} event${eventCount === 1 ? "" : "s"} across ${sessionCount} session${sessionCount === 1 ? "" : "s"}`);
-            if (lastEvent) {
-              console.log(`Last:     ${lastEvent.type} at ${lastEvent.timestamp}`);
-            }
-          } else {
-            console.log(`Activity: none since attach`);
+          if (session) {
+            console.log(`Edits:    ${session.has_edits ? "yes" : "no"} (this session)`);
+            console.log(`Last sync: ${session.stop_sync_requested_at ?? "never"}`);
           }
         } catch {
           console.log(`Activity: (state database unavailable)`);
@@ -61,14 +56,21 @@ export function registerStatusCommand(program: Command): void {
       console.log(``);
 
       if (jobs.length === 0) {
-        console.log(`No jobs yet. Run: continuity start "<job name>"`);
+        if (allJobs.length > 0) {
+          console.log(`No active jobs. Run: continuity status --all to see all jobs.`);
+        } else {
+          console.log(`No jobs yet. Run: continuity start "<job name>"`);
+        }
         return;
       }
 
-      console.log(`Jobs (${jobs.length}):`);
+      const label = opts.all ? `Jobs (${jobs.length})` : `Jobs (${jobs.length} active/paused)`;
+      console.log(`${label}:`);
       for (const job of jobs) {
+        const status = readJobStatus(job.dir);
         const marker = active?.slug === job.slug ? " ← attached" : "";
-        console.log(`  ${job.slug}${marker}`);
+        const statusTag = status === "complete" ? " [complete]" : status === "paused" ? " [paused]" : "";
+        console.log(`  ${job.slug}${statusTag}${marker}`);
       }
 
       console.log(``);

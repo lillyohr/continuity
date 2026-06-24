@@ -51,3 +51,13 @@ export function listJobs(projectRoot: string): JobSummary[] {
     .map((e) => ({ slug: e.name, dir: join(dir, e.name) }))
     .sort((a, b) => a.slug.localeCompare(b.slug));
 }
+
+export function readJobStatus(dir: string): string {
+  try {
+    const content = readFileSync(join(dir, "INDEX.md"), "utf8");
+    const m = content.match(/^status:\s*(\S+)/m);
+    return m?.[1] ?? "active";
+  } catch {
+    return "active";
+  }
+}
