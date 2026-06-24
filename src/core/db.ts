@@ -1,5 +1,5 @@
 import Database from "better-sqlite3";
-import { mkdirSync, readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, unlinkSync } from "node:fs";
 import { join, dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { stateDir } from "./paths.js";
@@ -9,7 +9,6 @@ const MIGRATIONS_DIR = join(dirname(fileURLToPath(import.meta.url)), "migrations
 
 const MIGRATIONS: { version: number; file: string }[] = [
   { version: 1, file: "001_initial.sql" },
-  { version: 2, file: "002_checkpoints.sql" },
 ];
 
 const _cache = new Map<string, Database.Database>();
@@ -34,9 +33,23 @@ export function openDb(projectRoot: string): Database.Database {
   const dir = stateDir(projectRoot);
   mkdirSync(dir, { recursive: true });
 
-  const db = new Database(join(dir, DB_FILENAME));
+  const dbPath = join(dir, DB_FILENAME);
+  let db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");
+
+  // One-time reset: pre-V2 DBs have an events table. Drop and recreate with
+  // the clean schema — events/checkpoints data is not user-facing.
+  const legacy = db.prepare(
+    `SELECT 1 FROM sqlite_master WHERE type='table' AND name='events'`
+  ).get();
+  if (legacy) {
+    db.close();
+    unlinkSync(dbPath);
+    db = new Database(dbPath);
+    db.pragma("journal_mode = WAL");
+    db.pragma("foreign_keys = ON");
+  }
 
   runMigrations(db);
   return db;

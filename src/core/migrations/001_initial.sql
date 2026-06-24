@@ -12,25 +12,12 @@ CREATE TABLE jobs (
 );
 
 CREATE TABLE sessions (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  job_id     TEXT REFERENCES jobs(job_id),
-  started_at TEXT NOT NULL,
-  ended_at   TEXT
+  id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_id                 TEXT NOT NULL REFERENCES jobs(job_id),
+  started_at             TEXT NOT NULL,
+  ended_at               TEXT,
+  has_edits              INTEGER NOT NULL DEFAULT 0,
+  stop_sync_requested_at TEXT
 );
 
-CREATE TABLE events (
-  id           INTEGER PRIMARY KEY AUTOINCREMENT,
-  timestamp    TEXT NOT NULL,
-  type         TEXT NOT NULL,
-  job_id       TEXT REFERENCES jobs(job_id),
-  session_id   INTEGER REFERENCES sessions(id),
-  slug         TEXT,
-  summary      TEXT NOT NULL,
-  payload_json TEXT
-);
-
-CREATE INDEX idx_sessions_job_id   ON sessions(job_id);
-CREATE INDEX idx_events_job_id     ON events(job_id);
-CREATE INDEX idx_events_session_id ON events(session_id);
-CREATE INDEX idx_events_timestamp  ON events(timestamp);
-CREATE INDEX idx_events_type       ON events(type);
+CREATE INDEX idx_sessions_job_id ON sessions(job_id);
