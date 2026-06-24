@@ -6,13 +6,13 @@ argument-hint: <slug>
 If no slug was provided, first run:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/cli/index.js" status
+continuity status
 ```
 
 Then ask the user which job to resume. Once you have the slug:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/dist/cli/index.js" resume <slug>
+continuity resume <slug>
 ```
 
 Then follow the printed resume instruction exactly:
