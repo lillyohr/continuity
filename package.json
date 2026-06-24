@@ -14,6 +14,7 @@
   "scripts": {
     "dev": "tsx src/cli/index.ts",
     "build": "tsc && mkdir -p dist/core/migrations && cp src/core/migrations/*.sql dist/core/migrations/",
+    "postinstall": "npm run build",
     "start": "node dist/cli/index.js",
     "test": "tsx --test tests/*.test.ts"
   },
